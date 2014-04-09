@@ -208,6 +208,7 @@ static struct omap_hwmod am33xx_debugss_hwmod = {
 	.name		= "debugss",
 	.class		= &am33xx_debugss_hwmod_class,
 	.clkdm_name	= "l3_aon_clkdm",
+	.flags		= HWMOD_INIT_NO_IDLE,
 	.main_clk	= "trace_clk_div_ck",
 	.prcm		= {
 		.omap4	= {
