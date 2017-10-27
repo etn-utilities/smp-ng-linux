@@ -208,6 +208,12 @@ static struct map_desc omapam33xx_io_desc[] __initdata = {
 		.pfn		= __phys_to_pfn(L4_WK_AM33XX_PHYS),
 		.length		= L4_WK_AM33XX_SIZE,
 		.type		= MT_DEVICE
+	},
+	{
+		.virtual	= L4_PER_AM33XX_VIRT,
+		.pfn		= __phys_to_pfn(L4_PER_AM33XX_PHYS),
+		.length		= L4_PER_AM33XX_SIZE,
+		.type		= MT_DEVICE
 	}
 };
 #endif
