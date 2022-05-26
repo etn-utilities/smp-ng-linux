@@ -156,12 +156,28 @@ static int ilitek_process_and_report_v6(struct ilitek_ts_data *ts)
 	struct input_dev *input = ts->input_dev;
 	struct device *dev = &ts->client->dev;
 	unsigned int x, y, status, id;
+    u8 checksum = 0;
 
 	error = ilitek_i2c_write_and_read(ts, NULL, 0, 0, buf, 64);
 	if (error) {
 		dev_err(dev, "get touch info failed, err:%d\n", error);
 		goto err_sync_frame;
 	}
+
+    if((buf[0] != 0x48) && (buf[0] != 0x04)) {
+		dev_warn(dev, "FW msg type error: 0x%02x\n", buf[0]);
+		error = -EINVAL;
+		goto err_sync_frame;
+    }
+
+    for (i=0; i<64; i++) {
+        checksum += buf[i];
+    }
+    if (checksum != 0) {
+		dev_warn(dev, "FW msg checksum error\n");
+		error = -EINVAL;
+		goto err_sync_frame;
+    }
 
 	report_max_point = buf[REPORT_COUNT_ADDRESS];
 	if (report_max_point > ts->max_tp) {
