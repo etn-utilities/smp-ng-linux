@@ -102,6 +102,11 @@ struct mxc_gpio_port {
 	u32 pad_wakeup_num;
 	struct mxc_gpio_pad_wakeup pad_wakeup[32];
 #endif
+
+	struct clk *clkRdc;
+	struct clk *clkSem;
+	void __iomem *pRDC;
+	void __iomem *pSEMA42;
 };
 
 #ifdef CONFIG_GPIO_MXC_PAD_WAKEUP
@@ -168,6 +173,398 @@ static struct mxc_gpio_hwdata imx35_gpio_hwdata = {
 #define GPIO_INT_FALL_EDGE	(port->hwdata->fall_edge)
 #define GPIO_INT_BOTH_EDGES	0x4
 
+
+///////////////////////////////////////
+///////////////////////////////////////
+// RDC access protection add-on
+// Code based on NXP/VARISCITE var-mcuxpresso RDC
+
+
+typedef enum _rdc_master
+{
+    kRDC_Master_A53                 = 0U,          /**< ARM Cortex-A53 RDC Master */
+    kRDC_Master_M4                  = 1U,          /**< ARM Cortex-M4 RDC Master */
+    kRDC_Master_PCIE1               = 2U,          /**< PCIE1 RDC Master */
+    kRDC_Master_PCIE2               = 3U,          /**< PCIE2 RDC Master */
+    kRDC_Master_VPU                 = 4U,          /**< VPU RDC Master */
+    kRDC_Master_LCDIF               = 5U,          /**< LCDIF RDC Master */
+    kRDC_Master_CSI1                = 6U,          /**< CSI1 PORT RDC Master */
+    kRDC_Master_CSI2                = 7U,          /**< CSI2 RDC Master */
+    kRDC_Master_Coresight           = 8U,          /**< CORESIGHT RDC Master */
+    kRDC_Master_DAP                 = 9U,          /**< DAP RDC Master */
+    kRDC_Master_CAAM                = 10U,         /**< CAAM RDC Master */
+    kRDC_Master_SDMA1_PERIPH        = 11U,         /**< SDMA1 PERIPHERAL RDC Master */
+    kRDC_Master_SDMA1_BURST         = 12U,         /**< SDMA1 BURST RDC Master */
+    kRDC_Master_APBHDMA             = 13U,         /**< APBH DMA RDC Master */
+    kRDC_Master_RAWNAND             = 14U,         /**< RAW NAND RDC Master */
+    kRDC_Master_USDHC1              = 15U,         /**< USDHC1 RDC Master */
+    kRDC_Master_USDHC2              = 16U,         /**< USDHC2 RDC Master */
+    kRDC_Master_DP                  = 17U,         /**< DP RDC Master */
+    kRDC_Master_GPU                 = 18U,         /**< GPU RDC Master */
+    kRDC_Master_USB1                = 19U,         /**< USB1 RDC Master */
+    kRDC_Master_USB2                = 20U,         /**< USB2 RDC Master */
+    kRDC_Master_TESTPORT            = 21U,         /**< TESTPORT RDC Master */
+    kRDC_Master_ENET1TX             = 22U,         /**< ENET1 TX RDC Master */
+    kRDC_Master_ENET1RX             = 23U,         /**< ENET1 RX RDC Master */
+    kRDC_Master_SDMA2_PERIPH        = 24U,         /**< SDMA2 PERIPH RDC Master */
+    kRDC_Master_SDMA2_BURST         = 24U,         /**< SDMA2 BURST RDC Master */
+    kRDC_Master_SDMA2_SPDA2         = 24U,         /**< SDMA2 to SPDA2 RDC Master */
+    kRDC_Master_SDMA1_SPBA1         = 26U,         /**< SDMA1 to SPBA1 RDC Master */
+} rdc_master_t;
+
+
+typedef enum _rdc_periph
+{
+    kRDC_Periph_GPIO1               = 0U,          /**< GPIO1 RDC Peripheral */
+    kRDC_Periph_GPIO2               = 1U,          /**< GPIO2 RDC Peripheral */
+    kRDC_Periph_GPIO3               = 2U,          /**< GPIO3 RDC Peripheral */
+    kRDC_Periph_GPIO4               = 3U,          /**< GPIO4 RDC Peripheral */
+    kRDC_Periph_GPIO5               = 4U,          /**< GPIO5 RDC Peripheral */
+    kRDC_Periph_ANA_TSENSOR         = 6U,          /**< ANA_TSENSOR RDC Peripheral */
+    kRDC_Periph_ANA_OSC             = 7U,          /**< ANA_OSC RDC Peripheral */
+    kRDC_Periph_WDOG1               = 8U,          /**< WDOG1 RDC Peripheral */
+    kRDC_Periph_WDOG2               = 9U,          /**< WDOG2 RDC Peripheral */
+    kRDC_Periph_WDOG3               = 10U,         /**< WDOG3 RDC Peripheral */
+    kRDC_Periph_SDMA2               = 12U,         /**< SDMA2 RDC Peripheral */
+    kRDC_Periph_GPT1                = 13U,         /**< GPT1 RDC Peripheral */
+    kRDC_Periph_GPT2                = 14U,         /**< GPT2 RDC Peripheral */
+    kRDC_Periph_GPT3                = 15U,         /**< GPT3 RDC Peripheral */
+    kRDC_Periph_ROMCP               = 17U,         /**< ROMCP RDC Peripheral */
+    kRDC_Periph_LCDIF               = 18U,         /**< LCDIF RDC Peripheral */
+    kRDC_Periph_IOMUXC              = 19U,         /**< IOMUXC RDC Peripheral */
+    kRDC_Periph_IOMUXC_GPR          = 20U,         /**< IOMUXC_GPR RDC Peripheral */
+    kRDC_Periph_OCOTP_CTRL          = 21U,         /**< OCOTP_CTRL RDC Peripheral */
+    kRDC_Periph_ANA_PLL             = 22U,         /**< ANA_PLL RDC Peripheral */
+    kRDC_Periph_SNVS_HP             = 23U,         /**< SNVS_HP GPR RDC Peripheral */
+    kRDC_Periph_CCM                 = 24U,         /**< CCM RDC Peripheral */
+    kRDC_Periph_SRC                 = 25U,         /**< SRC RDC Peripheral */
+    kRDC_Periph_GPC                 = 26U,         /**< GPC RDC Peripheral */
+    kRDC_Periph_SEMAPHORE1          = 27U,         /**< SEMAPHORE1 RDC Peripheral */
+    kRDC_Periph_SEMAPHORE2          = 28U,         /**< SEMAPHORE2 RDC Peripheral */
+    kRDC_Periph_RDC                 = 29U,         /**< RDC RDC Peripheral */
+    kRDC_Periph_CSU                 = 30U,         /**< CSU RDC Peripheral */
+    kRDC_Periph_DC_MST0             = 32U,         /**< DC_MST0 RDC Peripheral */
+    kRDC_Periph_DC_MST1             = 33U,         /**< DC_MST1 RDC Peripheral */
+    kRDC_Periph_DC_MST2             = 34U,         /**< DC_MST2 RDC Peripheral */
+    kRDC_Periph_DC_MST3             = 35U,         /**< DC_MST3 RDC Peripheral */
+    kRDC_Periph_HDMI_SEC            = 36U,         /**< HDMI_SEC RDC Peripheral */
+    kRDC_Periph_PWM1                = 38U,         /**< PWM1 RDC Peripheral */
+    kRDC_Periph_PWM2                = 39U,         /**< PWM2 RDC Peripheral */
+    kRDC_Periph_PWM3                = 40U,         /**< PWM3 RDC Peripheral */
+    kRDC_Periph_PWM4                = 41U,         /**< PWM4 RDC Peripheral */
+    kRDC_Periph_SYS_COUNTER_RD      = 42U,         /**< System counter read RDC Peripheral */
+    kRDC_Periph_SYS_COUNTER_CMP     = 43U,         /**< System counter compare RDC Peripheral */
+    kRDC_Periph_SYS_COUNTER_CTRL    = 44U,         /**< System counter control RDC Peripheral */
+    kRDC_Periph_HDMI_CTRL           = 45U,         /**< HDMI_CTRL RDC Peripheral */
+    kRDC_Periph_GPT6                = 46U,         /**< GPT6 RDC Peripheral */
+    kRDC_Periph_GPT5                = 47U,         /**< GPT5 RDC Peripheral */
+    kRDC_Periph_GPT4                = 48U,         /**< GPT4 RDC Peripheral */
+    kRDC_Periph_TZASC               = 56U,         /**< TZASC RDC Peripheral */
+    kRDC_Periph_MTR                 = 59U,         /**< MTR RDC Peripheral */
+    kRDC_Periph_PERFMON1            = 60U,         /**< PERFMON1 RDC Peripheral */
+    kRDC_Periph_PERFMON2            = 61U,         /**< PERFMON2 RDC Peripheral */
+    kRDC_Periph_PLATFORM_CTRL       = 62U,         /**< PLATFORM_CTRL RDC Peripheral */
+    kRDC_Periph_QOSC                = 63U,         /**< QOSC RDC Peripheral */
+    kRDC_Periph_MIPI_PHY            = 64U,         /**< MIPI_PHY RDC Peripheral */
+    kRDC_Periph_MIPI_DSI            = 65U,         /**< MIPI_DSI RDC Peripheral */
+    kRDC_Periph_I2C1                = 66U,         /**< I2C1 RDC Peripheral */
+    kRDC_Periph_I2C2                = 67U,         /**< I2C2 RDC Peripheral */
+    kRDC_Periph_I2C3                = 68U,         /**< I2C3 RDC Peripheral */
+    kRDC_Periph_I2C4                = 69U,         /**< I2C4 RDC Peripheral */
+    kRDC_Periph_UART4               = 70U,         /**< UART4 RDC Peripheral */
+    kRDC_Periph_MIPI_CSI1           = 71U,         /**< MIPI_CSI1 RDC Peripheral */
+    kRDC_Periph_MIPI_CSI_PHY1       = 72U,         /**< MIPI_CSI_PHY1 RDC Peripheral */
+    kRDC_Periph_CSI1                = 73U,         /**< CSI1 RDC Peripheral */
+    kRDC_Periph_MU_A                = 74U,         /**< MU_A RDC Peripheral */
+    kRDC_Periph_MU_B                = 75U,         /**< MU_B RDC Peripheral */
+    kRDC_Periph_SEMAPHORE_HS        = 76U,         /**< SEMAPHORE_HS RDC Peripheral */
+    kRDC_Periph_SAI1                = 78U,         /**< SAI1 RDC Peripheral */
+    kRDC_Periph_SAI6                = 80U,         /**< SAI6 RDC Peripheral */
+    kRDC_Periph_SAI5                = 81U,         /**< SAI5 RDC Peripheral */
+    kRDC_Periph_SAI4                = 82U,         /**< SAI4 RDC Peripheral */
+    kRDC_Periph_USDHC1              = 84U,         /**< USDHC1 RDC Peripheral */
+    kRDC_Periph_USDHC2              = 85U,         /**< USDHC2 RDC Peripheral */
+    kRDC_Periph_MIPI_CSI2           = 86U,         /**< MIPI_CSI2 RDC Peripheral */
+    kRDC_Periph_MIPI_CSI_PHY2       = 87U,         /**< MIPI_CSI_PHY2 RDC Peripheral */
+    kRDC_Periph_CSI2                = 88U,         /**< CSI2 RDC Peripheral */
+    kRDC_Periph_SPBA2               = 90U,         /**< SPBA2 RDC Peripheral */
+    kRDC_Periph_QSPI                = 91U,         /**< QSPI RDC Peripheral */
+    kRDC_Periph_SDMA1               = 93U,         /**< SDMA1 RDC Peripheral */
+    kRDC_Periph_ENET1               = 94U,         /**< ENET1 RDC Peripheral */
+    kRDC_Periph_SPDIF1              = 97U,         /**< SPDIF1 RDC Peripheral */
+    kRDC_Periph_ECSPI1              = 98U,         /**< ECSPI1 RDC Peripheral */
+    kRDC_Periph_ECSPI2              = 99U,         /**< ECSPI2 RDC Peripheral */
+    kRDC_Periph_ECSPI3              = 100U,        /**< ECSPI3 RDC Peripheral */
+    kRDC_Periph_UART1               = 102U,        /**< UART1 RDC Peripheral */
+    kRDC_Periph_UART3               = 104U,        /**< UART3 RDC Peripheral */
+    kRDC_Periph_UART2               = 105U,        /**< UART2 RDC Peripheral */
+    kRDC_Periph_SPDIF2              = 106U,        /**< SPDIF2 RDC Peripheral */
+    kRDC_Periph_SAI2                = 107U,        /**< SAI2 RDC Peripheral */
+    kRDC_Periph_SAI3                = 108U,        /**< SAI3 RDC Peripheral */
+    kRDC_Periph_SPBA1               = 111U,        /**< SPBA1 RDC Peripheral */
+    kRDC_Periph_CAAM                = 114U,        /**< CAAM RDC Peripheral */
+} rdc_periph_t;
+
+
+/** RDC - Register Layout Typedef */
+typedef struct
+{
+    u32     VIR; /**< Version Information, offset: 0x0 */
+    u8      RESERVED_0[32];
+    u32     STAT;    /**< Status, offset: 0x24 */
+    u32     INTCTRL; /**< Interrupt and Control, offset: 0x28 */
+    u32     INTSTAT; /**< Interrupt Status, offset: 0x2C */
+    u8      RESERVED_1[464];
+    u32     MDA[40]; /**< Master Domain Assignment, array offset: 0x200, array step: 0x4 */
+    u8      RESERVED_2[352];
+    u32     PDAP[112]; /**< Peripheral Domain Access Permissions, array offset: 0x400, array step: 0x4 */
+    u8      RESERVED_3[576];
+    struct
+    {                       /* offset: 0x800, array step: 0x10 */
+        u32     MRSA; /**< Memory Region Start Address, array offset: 0x800, array step: 0x10 */
+        u32     MREA; /**< Memory Region End Address, array offset: 0x804, array step: 0x10 */
+        u32     MRC;  /**< Memory Region Control, array offset: 0x808, array step: 0x10 */
+        u32     MRVS; /**< Memory Region Violation Status, array offset: 0x80C, array step: 0x10 */
+    } MR[77];
+} RDC_Type;
+
+
+/*
+ * Master index:
+ * All masters excluding ARM core: 0
+ * A53 core: 1
+ * M4 core: 6
+ * SDMA 3
+ */
+#define MASTER_INDEX 1
+#define DOMAIN_ID 0
+
+
+typedef struct _rdc_domain_assignment
+{
+    u32 domainId : 2U; /*!< Domain ID.                  */
+    u32 : 29U;         /*!< Reserved.                   */
+    u32 lock : 1U;     /*!< Lock the domain assignment. */
+} rdc_domain_assignment_t;
+
+
+typedef union
+{
+    rdc_domain_assignment_t _mda;
+    u32 _u32;
+} rdc_mda_reg_t;
+
+
+typedef struct _rdc_periph_access_config
+{
+    rdc_periph_t periph; /*!< Peripheral name.                 */
+    bool lock;           /*!< Lock the permission until reset. */
+    bool enableSema;     /*!< Enable semaphore or not, when enabled, master should
+                              call @ref RDC_SEMA42_Lock to lock the semaphore gate
+                              accordingly before access the peripheral. */
+    u16 policy;     /*!< Access policy.                   */
+} rdc_periph_access_config_t;
+
+
+void RDC_SEMA42_Lock(void *pSem)
+{
+    u8  masterIndex = MASTER_INDEX;
+    u8  domainId = DOMAIN_ID;
+    //u32 tryCnt = 0;
+    u8  regGate;
+
+
+    if (!pSem) {
+        return;
+    }
+
+    ++masterIndex;
+    regGate = (u8)((domainId << 4) | masterIndex);
+
+    while (regGate != readb(pSem))
+    {
+        /* Wait for unlocked status. */
+        if (0U == (readb(pSem) & 0x0f)) 
+        {
+            /* Lock the gate. */
+            writeb(masterIndex, pSem);
+        }
+
+        #if 0
+        tryCnt++;
+        if (tryCnt > 100000) {
+            printk(KERN_INFO "%s  (%d)  %s:  gate locked  pGate: %08x  %08x\n"
+                , __FILE__ , __LINE__, __func__
+                , (u32)pSem
+                , readb(pSem)
+            );
+            tryCnt = 0;
+            break;
+        }
+        #endif
+    }
+}
+
+
+void RDC_SEMA42_Unlock(void *pSem)
+{
+    if (pSem) {
+        writeb(0, pSem);
+    }
+}
+
+
+void RDC_SetMasterDomainAssignment(RDC_Type *base, rdc_master_t master, const rdc_domain_assignment_t *domainAssignment)
+{
+    rdc_mda_reg_t mda;
+
+    mda._mda = *domainAssignment;
+    //base->MDA[master] = mda._u32;
+	writel(mda._u32, &base->MDA[master]);
+}
+
+
+void rdc_Init(struct platform_device *pdev, struct mxc_gpio_port *port)
+{
+    int i1;
+
+    port->pRDC = 0;
+    port->pSEMA42 = 0;
+
+    for (i1=0; i1<pdev->num_resources; i1++) {
+        // imx_rdc reg
+        if (strncmp(pdev->resource[i1].name, "rdc_base", 8) == 0) {
+            port->pRDC = devm_platform_ioremap_resource(pdev, i1);
+            printk(KERN_INFO "%s  (%d)  %s:  %.20s (%08x)  resIdx:%d  %.20s  %08x  %08x\n"
+                , __FILE__ , __LINE__, __func__
+                , pdev->name
+                , (u32)port->base
+                , i1
+                , pdev->resource[i1].name
+                , pdev->resource[i1].start
+                , pdev->resource[i1].end
+            );
+        }
+
+        // sema42 reg
+        if (strncmp(pdev->resource[i1].name, "sem_base", 8) == 0) {
+            port->pSEMA42 = devm_platform_ioremap_resource(pdev, i1);
+            printk(KERN_INFO "%s  (%d)  %s:  %.20s (%08x)  resIdx:%d  %.20s  %08x  %08x  %08x\n"
+                , __FILE__ , __LINE__, __func__
+                , pdev->name
+                , (u32)port->base
+                , i1
+                , pdev->resource[i1].name
+                , pdev->resource[i1].start
+                , pdev->resource[i1].end
+                , (u32)port->pSEMA42
+            );
+        }
+    }
+
+    if (port->pRDC) {
+        rdc_domain_assignment_t assignment;
+        assignment.domainId = 0;
+        RDC_SetMasterDomainAssignment(port->pRDC, kRDC_Master_A53, &assignment);
+    }
+}
+
+
+static void reg_write8(unsigned long data, void __iomem *reg, void *pSem)
+{
+    RDC_SEMA42_Lock(pSem);
+	writeb(data, reg);
+    RDC_SEMA42_Unlock(pSem);
+}
+
+static unsigned long reg_read8(void __iomem *reg, void *pSem)
+{
+    unsigned long retVal;
+
+    RDC_SEMA42_Lock(pSem);
+	retVal = readb(reg);
+    RDC_SEMA42_Unlock(pSem);
+    return retVal;
+}
+
+static void reg_write16(unsigned long data, void __iomem *reg, void *pSem)
+{
+    RDC_SEMA42_Lock(pSem);
+	writew(data, reg);
+    RDC_SEMA42_Unlock(pSem);
+}
+
+static unsigned long reg_read16(void __iomem *reg, void *pSem)
+{
+    unsigned long retVal;
+
+    RDC_SEMA42_Lock(pSem);
+	retVal = readw(reg);
+    RDC_SEMA42_Unlock(pSem);
+    return retVal;
+}
+
+static void reg_write32(unsigned long data, void __iomem *reg, void *pSem)
+{
+    RDC_SEMA42_Lock(pSem);
+	writel(data, reg);
+    RDC_SEMA42_Unlock(pSem);
+}
+
+static unsigned long reg_read32(void __iomem *reg, void *pSem)
+{
+    unsigned long retVal;
+
+    RDC_SEMA42_Lock(pSem);
+	retVal = readl(reg);
+    RDC_SEMA42_Unlock(pSem);
+    return retVal;
+}
+
+static void reg_write32_bgpio(void __iomem *reg, unsigned long data, void __iomem *pSem)
+{
+    reg_write32(data, reg, pSem);
+}
+
+static unsigned long reg_read32_bgpio(void __iomem *reg, void __iomem *pSem)
+{
+    return reg_read32(reg, pSem);
+}
+
+
+static void reg_write32Gc(unsigned int data, void __iomem *reg,  void __iomem *pSem)
+{
+    reg_write32(data, reg, pSem);
+}
+
+static unsigned int reg_read32Gc(void __iomem *reg, void __iomem *pSem)
+{
+    return (unsigned int)reg_read32(reg, pSem);
+}
+
+// End RDC add-on
+///////////////////////////////////////
+///////////////////////////////////////
+
+
+static const struct platform_device_id mxc_gpio_devtype[] = {
+	{
+		.name = "imx1-gpio",
+		.driver_data = IMX1_GPIO,
+	}, {
+		.name = "imx21-gpio",
+		.driver_data = IMX21_GPIO,
+	}, {
+		.name = "imx31-gpio",
+		.driver_data = IMX31_GPIO,
+	}, {
+		.name = "imx35-gpio",
+		.driver_data = IMX35_GPIO,
+	}, {
+		/* sentinel */
+	}
+};
+
 static const struct of_device_id mxc_gpio_dt_ids[] = {
 	{ .compatible = "fsl,imx1-gpio", .data =  &imx1_imx21_gpio_hwdata },
 	{ .compatible = "fsl,imx21-gpio", .data = &imx1_imx21_gpio_hwdata },
@@ -230,23 +627,23 @@ static int gpio_set_irq_type(struct irq_data *d, u32 type)
 	}
 
 	if (GPIO_EDGE_SEL >= 0) {
-		val = readl(port->base + GPIO_EDGE_SEL);
+		val = reg_read32(port->base + GPIO_EDGE_SEL, port->pSEMA42);
 		if (edge == GPIO_INT_BOTH_EDGES)
-			writel(val | (1 << gpio_idx),
-				port->base + GPIO_EDGE_SEL);
+			reg_write32(val | (1 << gpio_idx),
+				port->base + GPIO_EDGE_SEL, port->pSEMA42);
 		else
-			writel(val & ~(1 << gpio_idx),
-				port->base + GPIO_EDGE_SEL);
+			reg_write32(val & ~(1 << gpio_idx),
+				port->base + GPIO_EDGE_SEL, port->pSEMA42);
 	}
 
 	if (edge != GPIO_INT_BOTH_EDGES) {
 		reg += GPIO_ICR1 + ((gpio_idx & 0x10) >> 2); /* lower or upper register */
 		bit = gpio_idx & 0xf;
-		val = readl(reg) & ~(0x3 << (bit << 1));
-		writel(val | (edge << (bit << 1)), reg);
+		val = reg_read32(reg, port->pSEMA42) & ~(0x3 << (bit << 1));
+		reg_write32(val | (edge << (bit << 1)), reg, port->pSEMA42);
 	}
 
-	writel(1 << gpio_idx, port->base + GPIO_ISR);
+	reg_write32(1 << gpio_idx, port->base + GPIO_ISR, port->pSEMA42);
 
 	return 0;
 }
@@ -259,7 +656,7 @@ static void mxc_flip_edge(struct mxc_gpio_port *port, u32 gpio)
 
 	reg += GPIO_ICR1 + ((gpio & 0x10) >> 2); /* lower or upper register */
 	bit = gpio & 0xf;
-	val = readl(reg);
+	val = reg_read32(reg, port->pSEMA42);
 	edge = (val >> (bit << 1)) & 3;
 	val &= ~(0x3 << (bit << 1));
 	if (edge == GPIO_INT_HIGH_LEV) {
@@ -273,7 +670,7 @@ static void mxc_flip_edge(struct mxc_gpio_port *port, u32 gpio)
 		       gpio, edge);
 		return;
 	}
-	writel(val | (edge << (bit << 1)), reg);
+	reg_write32(val | (edge << (bit << 1)), reg, port->pSEMA42);
 }
 
 /* handle 32 interrupts in one status register */
@@ -300,7 +697,7 @@ static void mx3_gpio_irq_handler(struct irq_desc *desc)
 
 	chained_irq_enter(chip, desc);
 
-	irq_stat = readl(port->base + GPIO_ISR) & readl(port->base + GPIO_IMR);
+	irq_stat = reg_read32(port->base + GPIO_ISR, port->pSEMA42) & reg_read32(port->base + GPIO_IMR, port->pSEMA42);
 
 	mxc_gpio_irq_handler(port, irq_stat);
 
@@ -318,11 +715,11 @@ static void mx2_gpio_irq_handler(struct irq_desc *desc)
 
 	/* walk through all interrupt status registers */
 	list_for_each_entry(port, &mxc_gpio_ports, node) {
-		irq_msk = readl(port->base + GPIO_IMR);
+		irq_msk = reg_read32(port->base + GPIO_IMR, port->pSEMA42);
 		if (!irq_msk)
 			continue;
 
-		irq_stat = readl(port->base + GPIO_ISR) & irq_msk;
+		irq_stat = reg_read32(port->base + GPIO_ISR, port->pSEMA42) & irq_msk;
 		if (irq_stat)
 			mxc_gpio_irq_handler(port, irq_stat);
 	}
@@ -494,6 +891,13 @@ static int mxc_gpio_init_gc(struct mxc_gpio_port *port, int irq_base,
 					 IRQ_GC_INIT_NESTED_LOCK,
 					 IRQ_NOREQUEST, 0);
 
+    #if 1
+    //This must be done after devm_irq_setup_generic_chip
+    gc->pSem = port->pSEMA42;
+    gc->reg_writelSem = reg_write32Gc;
+    gc->reg_readlSem = reg_read32Gc;
+    #endif
+
 	return rv;
 }
 
@@ -551,6 +955,8 @@ static int mxc_gpio_probe(struct platform_device *pdev)
 	if (IS_ERR(port->base))
 		return PTR_ERR(port->base);
 
+    rdc_Init(pdev, port);
+
 	irq_count = platform_irq_count(pdev);
 	if (irq_count < 0)
 		return irq_count;
@@ -573,6 +979,28 @@ static int mxc_gpio_probe(struct platform_device *pdev)
 	err = clk_prepare_enable(port->clk);
 	if (err) {
 		dev_err(&pdev->dev, "Unable to enable clock.\n");
+		return err;
+	}
+
+    // Add RDC controller clock
+	port->clkRdc = devm_clk_get_optional(&pdev->dev, "rdc");
+	if (IS_ERR(port->clkRdc))
+		return PTR_ERR(port->clkRdc);
+
+	err = clk_prepare_enable(port->clkRdc);
+	if (err) {
+		dev_err(&pdev->dev, "Unable to enable clock clkRdc.\n");
+		return err;
+	}
+
+    // Add SEMA42 controller clock
+	port->clkSem = devm_clk_get_optional(&pdev->dev, "sem");
+	if (IS_ERR(port->clkSem))
+		return PTR_ERR(port->clkSem);
+
+	err = clk_prepare_enable(port->clkSem);
+	if (err) {
+		dev_err(&pdev->dev, "Unable to enable clock clkSem.\n");
 		return err;
 	}
 
@@ -615,8 +1043,8 @@ static int mxc_gpio_probe(struct platform_device *pdev)
 		goto out_pm_dis;
 
 	/* disable the interrupt and clear the status */
-	writel(0, port->base + GPIO_IMR);
-	writel(~0, port->base + GPIO_ISR);
+	reg_write32(0, port->base + GPIO_IMR, port->pSEMA42);
+	reg_write32(~0, port->base + GPIO_ISR, port->pSEMA42);
 
 	if (of_device_is_compatible(np, "fsl,imx21-gpio")) {
 		/*
@@ -636,6 +1064,9 @@ static int mxc_gpio_probe(struct platform_device *pdev)
 							 port);
 	}
 
+    port->gc.pSem = port->pSEMA42;
+    port->gc.read_regSem = reg_read32_bgpio;
+    port->gc.write_regSem = reg_write32_bgpio;
 	err = bgpio_init(&port->gc, &pdev->dev, 4,
 			 port->base + GPIO_PSR,
 			 port->base + GPIO_DR, NULL,
@@ -688,10 +1119,14 @@ static int mxc_gpio_probe(struct platform_device *pdev)
 out_pm_dis:
 	pm_runtime_disable(&pdev->dev);
 	clk_disable_unprepare(port->clk);
+	clk_disable_unprepare(port->clkRdc);
+	clk_disable_unprepare(port->clkSem);
 out_irqdomain_remove:
 	irq_domain_remove(port->domain);
 out_bgio:
 	clk_disable_unprepare(port->clk);
+	clk_disable_unprepare(port->clkRdc);
+	clk_disable_unprepare(port->clkSem);
 	dev_info(&pdev->dev, "%s failed with errno %d\n", __func__, err);
 	return err;
 }
@@ -701,12 +1136,12 @@ static void mxc_gpio_save_regs(struct mxc_gpio_port *port)
 	if (!port->power_off)
 		return;
 
-	port->gpio_saved_reg.icr1 = readl(port->base + GPIO_ICR1);
-	port->gpio_saved_reg.icr2 = readl(port->base + GPIO_ICR2);
-	port->gpio_saved_reg.imr = readl(port->base + GPIO_IMR);
-	port->gpio_saved_reg.gdir = readl(port->base + GPIO_GDIR);
-	port->gpio_saved_reg.edge_sel = readl(port->base + GPIO_EDGE_SEL);
-	port->gpio_saved_reg.dr = readl(port->base + GPIO_DR);
+	port->gpio_saved_reg.icr1 = reg_read32(port->base + GPIO_ICR1, port->pSEMA42);
+	port->gpio_saved_reg.icr2 = reg_read32(port->base + GPIO_ICR2, port->pSEMA42);
+	port->gpio_saved_reg.imr = reg_read32(port->base + GPIO_IMR, port->pSEMA42);
+	port->gpio_saved_reg.gdir = reg_read32(port->base + GPIO_GDIR, port->pSEMA42);
+	port->gpio_saved_reg.edge_sel = reg_read32(port->base + GPIO_EDGE_SEL, port->pSEMA42);
+	port->gpio_saved_reg.dr = reg_read32(port->base + GPIO_DR, port->pSEMA42);
 }
 
 static void mxc_gpio_restore_regs(struct mxc_gpio_port *port)
@@ -714,12 +1149,12 @@ static void mxc_gpio_restore_regs(struct mxc_gpio_port *port)
 	if (!port->power_off)
 		return;
 
-	writel(port->gpio_saved_reg.icr1, port->base + GPIO_ICR1);
-	writel(port->gpio_saved_reg.icr2, port->base + GPIO_ICR2);
-	writel(port->gpio_saved_reg.imr, port->base + GPIO_IMR);
-	writel(port->gpio_saved_reg.gdir, port->base + GPIO_GDIR);
-	writel(port->gpio_saved_reg.edge_sel, port->base + GPIO_EDGE_SEL);
-	writel(port->gpio_saved_reg.dr, port->base + GPIO_DR);
+	reg_write32(port->gpio_saved_reg.icr1, port->base + GPIO_ICR1, port->pSEMA42);
+	reg_write32(port->gpio_saved_reg.icr2, port->base + GPIO_ICR2, port->pSEMA42);
+	reg_write32(port->gpio_saved_reg.imr, port->base + GPIO_IMR, port->pSEMA42);
+	reg_write32(port->gpio_saved_reg.gdir, port->base + GPIO_GDIR, port->pSEMA42);
+	reg_write32(port->gpio_saved_reg.edge_sel, port->base + GPIO_EDGE_SEL, port->pSEMA42);
+	reg_write32(port->gpio_saved_reg.dr, port->base + GPIO_DR, port->pSEMA42);
 }
 
 static int __maybe_unused mxc_gpio_runtime_suspend(struct device *dev)
@@ -729,6 +1164,8 @@ static int __maybe_unused mxc_gpio_runtime_suspend(struct device *dev)
 
 	mxc_gpio_save_regs(port);
 	clk_disable_unprepare(port->clk);
+	clk_disable_unprepare(port->clkRdc);
+	clk_disable_unprepare(port->clkSem);
 
 	return 0;
 }
@@ -740,6 +1177,14 @@ static int __maybe_unused mxc_gpio_runtime_resume(struct device *dev)
 	int ret;
 
 	ret = clk_prepare_enable(port->clk);
+	if (ret)
+		return ret;
+
+	ret = clk_prepare_enable(port->clkRdc);
+	if (ret)
+		return ret;
+
+	ret = clk_prepare_enable(port->clkSem);
 	if (ret)
 		return ret;
 
@@ -789,8 +1234,20 @@ static int mxc_gpio_syscore_suspend(void)
 		ret = clk_prepare_enable(port->clk);
 		if (ret)
 			return ret;
+
+		ret = clk_prepare_enable(port->clkRdc);
+		if (ret)
+			return ret;
+
+		ret = clk_prepare_enable(port->clkSem);
+		if (ret)
+			return ret;
+
+
 		mxc_gpio_save_regs(port);
 		clk_disable_unprepare(port->clk);
+		clk_disable_unprepare(port->clkRdc);
+		clk_disable_unprepare(port->clkSem);
 	}
 
 	return 0;
@@ -808,8 +1265,23 @@ static void mxc_gpio_syscore_resume(void)
 			pr_err("mxc: failed to enable gpio clock %d\n", ret);
 			return;
 		}
+
+		ret = clk_prepare_enable(port->clkRdc);
+		if (ret) {
+			pr_err("mxc: failed to enable gpio clock %d\n", ret);
+			return;
+		}
+
+		ret = clk_prepare_enable(port->clkSem);
+		if (ret) {
+			pr_err("mxc: failed to enable gpio clock %d\n", ret);
+			return;
+		}
+
 		mxc_gpio_restore_regs(port);
 		clk_disable_unprepare(port->clk);
+		clk_disable_unprepare(port->clkRdc); //!!! seems wrong
+		clk_disable_unprepare(port->clkSem); //!!! seems wrong
 	}
 }
 

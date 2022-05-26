@@ -415,8 +415,8 @@ struct gpio_chip {
 	bool			can_sleep;
 
 #if IS_ENABLED(CONFIG_GPIO_GENERIC)
-	unsigned long (*read_reg)(void __iomem *reg);
-	void (*write_reg)(void __iomem *reg, unsigned long data);
+	unsigned long (*read_regOld)(void __iomem *reg);
+	void (*write_regOld)(void __iomem *reg, unsigned long data);
 	bool be_bits;
 	void __iomem *reg_dat;
 	void __iomem *reg_set;
@@ -494,6 +494,11 @@ struct gpio_chip {
 				       struct device_node *np);
 
 #endif /* CONFIG_OF_GPIO */
+
+    void __iomem *pSem;
+	unsigned long (*read_regSem)(void __iomem *reg, void __iomem *pSem);
+	void (*write_regSem)(void __iomem *reg, unsigned long data, void __iomem *pSem);
+
 };
 
 extern const char *gpiochip_is_requested(struct gpio_chip *gc,
