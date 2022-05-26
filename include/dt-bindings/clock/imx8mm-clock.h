@@ -249,6 +249,10 @@
 #define IMX8MM_CLK_GIC				229
 #define IMX8MM_CLK_A53_CORE			230
 
-#define IMX8MM_CLK_END				231
+#define IMX8MM_CLK_RDC_ROOT				231
+#define IMX8MM_CLK_SEMA42_1_ROOT		232
+#define IMX8MM_CLK_SEMA42_2_ROOT		233
+
+#define IMX8MM_CLK_END				234
 
 #endif
