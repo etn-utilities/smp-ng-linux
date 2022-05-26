@@ -30,6 +30,9 @@
 #include <linux/io.h>
 #include <linux/dma-mapping.h>
 
+#include <linux/gpio.h>
+#include <linux/of_gpio.h>
+
 #include <asm/irq.h>
 #include <linux/busfreq-imx.h>
 #include <linux/pm_qos.h>
@@ -243,6 +246,11 @@ struct imx_port {
 	struct hrtimer		trigger_stop_tx;
 
 	struct pm_qos_request   pm_qos_req;
+
+	int             rs232_gpio;
+	int             rs485_gpio;
+	int             irigout_gpio;
+    unsigned int    rs485_enabled_at_boot_time;
 };
 
 struct imx_port_ucrs {
@@ -384,6 +392,12 @@ static void imx_uart_ucrs_restore(struct imx_port *sport,
 /* called with port.lock taken and irqs caller dependent */
 static void imx_uart_rts_active(struct imx_port *sport, u32 *ucr2)
 {
+    #if 0
+    printk(KERN_INFO "%s  (%d)  %s:\n"
+        , __FILE__ , __LINE__, __func__
+    );
+    #endif
+
 	*ucr2 &= ~(UCR2_CTSC | UCR2_CTS);
 
 	sport->port.mctrl |= TIOCM_RTS;
@@ -393,6 +407,12 @@ static void imx_uart_rts_active(struct imx_port *sport, u32 *ucr2)
 /* called with port.lock taken and irqs caller dependent */
 static void imx_uart_rts_inactive(struct imx_port *sport, u32 *ucr2)
 {
+    #if 0
+    printk(KERN_INFO "%s  (%d)  %s:\n"
+        , __FILE__ , __LINE__, __func__
+    );
+    #endif
+
 	*ucr2 &= ~UCR2_CTSC;
 	*ucr2 |= UCR2_CTS;
 
@@ -1518,6 +1538,38 @@ static int imx_uart_startup(struct uart_port *port)
 
 	spin_unlock_irqrestore(&sport->port.lock, flags);
 
+    #if 1
+    if (sport->rs232_gpio >= 0) {
+        gpio_set_value(sport->rs232_gpio, 0);
+    }
+    if (sport->rs485_gpio >= 0) {
+        gpio_set_value(sport->rs485_gpio, 0);
+    }
+    if (sport->irigout_gpio >= 0) {
+        gpio_set_value(sport->irigout_gpio, 0);
+    }
+
+    if (sport->rs485_enabled_at_boot_time) {
+        printk(KERN_INFO "%s  (%d)  %s:  RS485 enabled.\n"
+            , __FILE__ , __LINE__, __func__
+        );
+        port->rs485.flags |= SER_RS485_ENABLED;     //reset flag if previoulsy overriden by manual command
+        if (sport->rs485_gpio >= 0) {
+            gpio_set_value(sport->rs485_gpio, 1);
+        }
+    }
+    else {
+        printk(KERN_INFO "%s  (%d)  %s:  RS232 enabled.\n"
+            , __FILE__ , __LINE__, __func__
+        );
+        port->rs485.flags &= ~SER_RS485_ENABLED;    //reset flag if previoulsy overriden by manual command
+                                                    //485 mode must be set manualy in termios parameters
+        if (sport->rs232_gpio >= 0) {
+            gpio_set_value(sport->rs232_gpio, 1);
+        }
+    }
+    #endif
+
 	return 0;
 }
 
@@ -1580,6 +1632,21 @@ static void imx_uart_shutdown(struct uart_port *port)
 
 	clk_disable_unprepare(sport->clk_per);
 	clk_disable_unprepare(sport->clk_ipg);
+
+    #if 1
+    if (sport->rs232_gpio >= 0) {
+        gpio_set_value(sport->rs232_gpio, 0);
+        printk(KERN_INFO "%s  (%d)  %s:  Tristate enabled.\n"
+            , __FILE__ , __LINE__, __func__
+        );
+    }
+    if (sport->rs485_gpio >= 0) {
+        gpio_set_value(sport->rs485_gpio, 0);
+    }
+    if (sport->irigout_gpio >= 0) {
+        gpio_set_value(sport->irigout_gpio, 0);
+    }
+    #endif
 }
 
 /* called with port.lock taken and irqs off */
@@ -1934,6 +2001,9 @@ static int imx_uart_rs485_config(struct uart_port *port,
 		rs485conf->flags &= ~SER_RS485_ENABLED;
 
 	if (rs485conf->flags & SER_RS485_ENABLED) {
+        printk(KERN_INFO "%s  (%d)  %s:  RS485 enabled\n"
+            , __FILE__ , __LINE__, __func__
+        );
 		/* Enable receiver if low-active RTS signal is requested */
 		if (sport->have_rtscts &&  !sport->have_rtsgpio &&
 		    !(rs485conf->flags & SER_RS485_RTS_ON_SEND))
@@ -1947,6 +2017,11 @@ static int imx_uart_rs485_config(struct uart_port *port,
 			imx_uart_rts_inactive(sport, &ucr2);
 		imx_uart_writel(sport, ucr2, UCR2);
 	}
+    else {
+        printk(KERN_INFO "%s  (%d)  %s:  RS232 enabled\n"
+            , __FILE__ , __LINE__, __func__
+        );
+    }
 
 	/* Make sure Rx is enabled in case Tx is active with Rx disabled */
 	if (!(rs485conf->flags & SER_RS485_ENABLED) ||
@@ -1957,6 +2032,52 @@ static int imx_uart_rs485_config(struct uart_port *port,
 
 	return 0;
 }
+
+//DA3050 addon
+static int imx_uart_ioctl(struct uart_port *port, unsigned int cmd, unsigned long arg)
+{
+   	int ret = -ENOIOCTLCMD;
+	struct imx_port *sport = (struct imx_port *)port;
+
+    switch (cmd)
+    {
+    case TIOCSERSETMEDIA:
+        /* code */
+        #if 0
+        printk(KERN_INFO "%s  (%d)  %s:  cmd:%08x  arg:%08x\n"
+            , __FILE__ , __LINE__, __func__
+            , cmd, arg
+        );
+        #endif
+
+        if ((arg & (RS232_ENABLE | RS485_ENABLE)) == (RS232_ENABLE | RS485_ENABLE)) {
+            printk(KERN_INFO "%s  (%d)  %s:  Error: RS232 and RS485 buffers cannot be enabled simultaneously.  %08x\n"
+                , __FILE__ , __LINE__, __func__
+                ,  (RS232_ENABLE | RS485_ENABLE)
+            );
+            arg &= ~(RS232_ENABLE | RS485_ENABLE);
+        }
+
+        if (sport->rs232_gpio >= 0) {
+            gpio_set_value(sport->rs232_gpio, (arg & RS232_ENABLE) ? 1 : 0);
+        }
+        if (sport->rs485_gpio >= 0) {
+            gpio_set_value(sport->rs485_gpio, (arg & RS485_ENABLE) ? 1 : 0);
+        }
+        if (sport->irigout_gpio >= 0) {
+            gpio_set_value(sport->irigout_gpio, (arg & IRIGOUT_ENABLE) ? 1 : 0);
+        }
+
+        ret = 0;
+        break;
+    
+    default:
+        break;
+    }
+
+    return ret;
+}
+
 
 static const struct uart_ops imx_uart_pops = {
 	.tx_empty	= imx_uart_tx_empty,
@@ -1979,6 +2100,7 @@ static const struct uart_ops imx_uart_pops = {
 	.poll_get_char  = imx_uart_poll_get_char,
 	.poll_put_char  = imx_uart_poll_put_char,
 #endif
+    .ioctl = imx_uart_ioctl,
 };
 
 static struct imx_port *imx_uart_ports[UART_NR];
@@ -2244,6 +2366,10 @@ static int imx_uart_probe(struct platform_device *pdev)
 	if (of_get_property(np, "rts-gpios", NULL))
 		sport->have_rtsgpio = 1;
 
+	if (of_get_property(np, "linux,rs485-enabled-at-boot-time", NULL)) {
+		sport->rs485_enabled_at_boot_time = 1;
+    }
+
 	if (of_get_property(np, "fsl,inverted-tx", NULL))
 		sport->inverted_tx = 1;
 
@@ -2433,6 +2559,78 @@ static int imx_uart_probe(struct platform_device *pdev)
 			return ret;
 		}
 	}
+
+    //DA3050 addon
+    {
+	struct device_node *np = pdev->dev.of_node;
+
+    sport->rs232_gpio =	-1;
+    if (of_find_property(np, "rs232_enable-gpio", NULL)) {
+
+        sport->rs232_gpio =	of_get_named_gpio(np, "rs232_enable-gpio", 0);
+        if (gpio_is_valid(sport->rs232_gpio)) {
+            ret = devm_gpio_request(&pdev->dev, sport->rs232_gpio, "rs232_enable-gpio");
+            if (ret) {
+                sport->rs232_gpio =	-3;
+            }
+            else {
+                gpio_direction_output(sport->rs232_gpio, 0);
+            }
+        }
+    }
+    printk(KERN_ERR "%s  (%d):  %s:  rs232_enable-gpio: %d\n"
+        , __FILE__ , __LINE__, __func__
+        , sport->rs232_gpio
+    );
+    if (sport->rs232_gpio == -EPROBE_DEFER) {
+        return sport->rs232_gpio;
+    }
+
+    sport->rs485_gpio =	-1;
+    if (of_find_property(np, "rs485_enable-gpio", NULL)) {
+
+        sport->rs485_gpio =	of_get_named_gpio(np, "rs485_enable-gpio", 0);
+        if (gpio_is_valid(sport->rs485_gpio)) {
+            ret = devm_gpio_request(&pdev->dev, sport->rs485_gpio, "rs485_enable-gpio");
+            if (ret) {
+                sport->rs485_gpio =	-3;
+            }
+            else {
+                gpio_direction_output(sport->rs485_gpio, 0);
+            }
+        }
+    }
+    printk(KERN_ERR "%s  (%d):  %s:  rs485_enable-gpio: %d\n"
+        , __FILE__ , __LINE__, __func__
+        , sport->rs485_gpio
+    );
+    if (sport->rs485_gpio == -EPROBE_DEFER) {
+        return sport->rs485_gpio;
+    }
+
+    sport->irigout_gpio =	-1;
+    if (of_find_property(np, "irigout_enable-gpio", NULL)) {
+
+        sport->irigout_gpio =	of_get_named_gpio(np, "irigout_enable-gpio", 0);
+        if (gpio_is_valid(sport->irigout_gpio)) {
+            ret = devm_gpio_request(&pdev->dev, sport->irigout_gpio, "irigout_enable-gpio");
+            if (ret) {
+                sport->irigout_gpio =	-3;
+            }
+            else {
+                gpio_direction_output(sport->irigout_gpio, 0);
+            }
+        }
+    }
+    printk(KERN_ERR "%s  (%d):  %s:  irigout_enable-gpio: %d\n"
+        , __FILE__ , __LINE__, __func__
+        , sport->irigout_gpio
+    );
+    if (sport->irigout_gpio == -EPROBE_DEFER) {
+        return sport->irigout_gpio;
+    }
+
+    }
 
 	imx_uart_ports[sport->port.line] = sport;
 
