@@ -482,6 +482,27 @@ static s32 igb_init_mac_params_82575(struct e1000_hw *hw)
 	return 0;
 }
 
+static void cleanup_str(char *str, int lenStr)
+{
+    int i;
+    if (lenStr) {
+        for (i = 0 ; i < lenStr ;i++) {
+            if ((str[i] & 0x80) || !isprint((int)str[i])) {
+                str[i] = '.';
+            }
+        }
+        // Remove trailing spaces.
+        for (i = lenStr - 1 ; i >= 0 ; i--) {
+            if (str[i] == ' ') {
+                str[i] = 0;
+            }
+            else {
+                break;
+            }
+        }
+    }
+}
+
 /**
  *  igb_set_sfp_media_type_82575 - derives SFP module media type.
  *  @hw: pointer to the HW structure
@@ -505,6 +526,8 @@ static s32 igb_set_sfp_media_type_82575(struct e1000_hw *hw)
 
 	wrfl();
 
+	#if 0
+	
 	/* Read SFP module data */
 	while (timeout) {
 		ret_val = igb_read_sfp_data_byte(hw,
@@ -523,6 +546,109 @@ static s32 igb_set_sfp_media_type_82575(struct e1000_hw *hw)
 			(u8 *)eth_flags);
 	if (ret_val != 0)
 		goto out;
+	
+	#else
+	s32 cnt;
+
+    hw->sfp_dataSize = 0;
+    memset(hw->sfp_vendorName, 0, sizeof(hw->sfp_vendorName));
+    memset(hw->sfp_vendorPn, 0, sizeof(hw->sfp_vendorPn));
+    memset(hw->sfp_vendorRev, 0, sizeof(hw->sfp_vendorRev));
+    memset(hw->sfp_vendorSn, 0, sizeof(hw->sfp_vendorSn));
+    memset(hw->sfp_vendorDc, 0, sizeof(hw->sfp_vendorDc));
+
+    /* Read SFP module data */
+    timeout = 3;
+    cnt   	= 0;
+	while (cnt < sizeof(hw->sfp_data)) {
+    	ret_val = igb_read_sfp_data_byte(hw, E1000_I2CCMD_SFP_DATA_ADDR(cnt), &hw->sfp_data[cnt]);
+        if (ret_val == 0) {
+            timeout = 3;
+            cnt++;
+        }
+        else {
+            if (timeout) {
+                timeout--;
+                if (timeout == 0) {
+					printk(
+						KERN_INFO "%s  (%4d): I210: SFP not installed or I2C not working.\n"
+						, __FILE__, __LINE__
+					);
+                    goto out;
+                }
+				msleep(100);
+            }
+        }
+	}
+	hw->sfp_dataSize = cnt;
+
+	memcpy(hw->sfp_vendorName, &hw->sfp_data[E1000_SFF_VENDOR_NAME_OFFSET], E1000_SFF_VENDOR_NAME_SIZE);
+	cleanup_str(hw->sfp_vendorName, E1000_SFF_VENDOR_NAME_SIZE);
+	memcpy(hw->sfp_vendorPn, &hw->sfp_data[E1000_SFF_VENDOR_PN_OFFSET], E1000_SFF_VENDOR_PN_SIZE);
+	cleanup_str(hw->sfp_vendorPn, E1000_SFF_VENDOR_PN_SIZE);
+	memcpy(hw->sfp_vendorRev, &hw->sfp_data[E1000_SFF_VENDOR_REV_OFFSET], E1000_SFF_VENDOR_REV_SIZE);
+	cleanup_str(hw->sfp_vendorRev, E1000_SFF_VENDOR_REV_SIZE);
+	memcpy(hw->sfp_vendorSn, &hw->sfp_data[E1000_SFF_VENDOR_SN_OFFSET], E1000_SFF_VENDOR_SN_SIZE);
+	cleanup_str(hw->sfp_vendorSn, E1000_SFF_VENDOR_SN_SIZE);
+	memcpy(hw->sfp_vendorDc, &hw->sfp_data[E1000_SFF_VENDOR_DC_OFFSET], E1000_SFF_VENDOR_DC_SIZE);
+	cleanup_str(hw->sfp_vendorDc, E1000_SFF_VENDOR_DC_SIZE);
+
+	printk(
+		KERN_INFO "%s  (%4d):     VENDOR NAME: \"%hs\" \n"
+		, __FILE__, __LINE__
+		, hw->sfp_vendorName
+	);
+	printk(
+		KERN_INFO "%s  (%4d):     PART NUMBER: \"%hs\"\n"
+		, __FILE__, __LINE__
+		, hw->sfp_vendorPn
+	);
+	printk(
+		KERN_INFO "%s  (%4d):             REV: \"%hs\"\n"
+		, __FILE__, __LINE__
+		, hw->sfp_vendorRev
+	);
+	printk(
+		KERN_INFO "%s  (%4d):   SERIAL NUMBER: \"%hs\"\n"
+		, __FILE__, __LINE__
+		, hw->sfp_vendorSn
+	);
+	printk(
+		KERN_INFO "%s  (%4d):       DATE CODE: \"%hs\"\n"
+		, __FILE__, __LINE__
+		, hw->sfp_vendorDc
+	);
+
+	tranceiver_type = hw->sfp_data[E1000_SFF_IDENTIFIER_OFFSET];
+	*(u8*)eth_flags = hw->sfp_data[E1000_SFF_ETH_FLAGS_OFFSET];
+
+	printk(
+		KERN_INFO "%s  (%4d): TRANSCEIVER TYPE: %x\n"
+		, __FILE__, __LINE__
+		, tranceiver_type
+	);
+
+
+	//  Bit      Standard                    I210 mode
+	//  0        10000BASE-SX                SERDES, no autoneg
+	//  1        10000BASE-LX                SERDES, no autoneg
+	//  2        1000BASE-CX        
+	//  3        1000BASE-T                  SGMII, autoneg
+	//  4        100BASE-LX
+	//  5        100BASE-FX
+	//
+	//  NOTE: I210 configured with SGMII flash by default. Must reconfigure for SERDES mode.
+	//
+	printk(
+		KERN_INFO "%s  (%4d): GIGABIT ETHERNET COMPLIANCE CODE = %x\n"
+		, __FILE__, __LINE__
+		, eth_flags
+	);
+
+	/* Fix for incorrect modules types reported */
+	tranceiver_type = E1000_SFF_IDENTIFIER_SFP;
+	#endif
+
 
 	/* Check if there is some SFP module plugged and powered */
 	if ((tranceiver_type == E1000_SFF_IDENTIFIER_SFP) ||
@@ -530,19 +656,42 @@ static s32 igb_set_sfp_media_type_82575(struct e1000_hw *hw)
 		dev_spec->module_plugged = true;
 		if (eth_flags->e1000_base_lx || eth_flags->e1000_base_sx) {
 			hw->phy.media_type = e1000_media_type_internal_serdes;
+
+            //ctrl_ext &= ~E1000_CTRL_EXT_LINK_MODE_MASK;
+            //ctrl_ext |= E1000_CTRL_EXT_LINK_MODE_1000BASE_KX;
+			printk(
+				KERN_INFO "%s  (%4d): %s\n"
+				, __FILE__, __LINE__, eth_flags->e1000_base_sx ? "I210: 1000BASE-SX [SERDES]" : "I210: 1000BASE-LX [SERDES]"
+			);
 		} else if (eth_flags->e100_base_fx || eth_flags->e100_base_lx) {
 			dev_spec->sgmii_active = true;
 			hw->phy.media_type = e1000_media_type_internal_serdes;
+			printk(
+				KERN_INFO "%s  (%4d): %s\n"
+				, __FILE__, __LINE__, eth_flags->e100_base_fx ? "I210: 100BASE-FX [SGMII]" : "I210: 100BASE-LX [SGMII]"
+			);
 		} else if (eth_flags->e1000_base_t) {
 			dev_spec->sgmii_active = true;
 			hw->phy.media_type = e1000_media_type_copper;
+			printk(
+				KERN_INFO "%s  (%4d): PHY 1000BASE-T [SGMII]\n"
+				, __FILE__, __LINE__
+			);
 		} else {
 			hw->phy.media_type = e1000_media_type_unknown;
 			hw_dbg("PHY module has not been recognized\n");
+			printk(
+				KERN_INFO "%s  (%4d): I210: PHY module has not been recognized\n"
+				, __FILE__, __LINE__
+			);
 			goto out;
 		}
 	} else {
 		hw->phy.media_type = e1000_media_type_unknown;
+		printk(
+			KERN_INFO "%s  (%4d): I210: PHY module unknown\n"
+			, __FILE__, __LINE__
+		);
 	}
 	ret_val = 0;
 out:
