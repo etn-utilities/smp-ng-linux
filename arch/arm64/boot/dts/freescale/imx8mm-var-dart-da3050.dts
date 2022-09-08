@@ -121,6 +121,14 @@
 		compatible = "nxp,pcf8563";
 		reg = <0x51>;
     };
+
+    /*
+	tcg-tpm@2E {
+        status = "okay";
+		compatible = "st,st33htpm-i2c";
+		reg = <0x2E>;
+    };
+    */
 };
 
 &i2c3 {
@@ -819,7 +827,8 @@ pinctrl-0 = <&pinctrl_uart4>, <&pinctrl_uart4_ext>, <&pinctrl_bt>;
         compatible = "da3050_gpioled";
         pinctrl-names = "default";
         status = "okay";
-        pinctrl-0 = <&pinctrl_gpioled>;
+        pinctrl-0 = <&pinctrl_gpioled>, <&pinctrl_cellmodem>;
+        //pinctrl-0 = <&pinctrl_gpioled>, <&pinctrl_cellmodem>, <&pinctrl_expensiongpios>, <&pinctrl_freegpios>;
 
         led_sync_g-gpio = <&gpio1 13 GPIO_ACTIVE_HIGH>;
         led_sync_r-gpio = <&gpio1 14 GPIO_ACTIVE_HIGH>;
@@ -827,6 +836,18 @@ pinctrl-0 = <&pinctrl_uart4>, <&pinctrl_uart4_ext>, <&pinctrl_bt>;
         pf_clr-gpio     = <&gpio4  1 GPIO_ACTIVE_HIGH>;
         led_test-gpio   = <&gpio1  5 GPIO_ACTIVE_HIGH>;
         btn_get-gpio    = <&gpio1  0 GPIO_ACTIVE_HIGH>;
+
+        cell_off_on-gpio =     <&gpio4 20 GPIO_ACTIVE_HIGH>;
+        cell_reset_not-gpio =  <&gpio5 4 GPIO_ACTIVE_HIGH>;
+        cell_status-gpio =     <&gpio5 3 GPIO_ACTIVE_HIGH>;
+
+        /*
+        Internal pull resistor test on inactive GPIOs!!!
+        gpio1_12-gpio   = <&gpio1 12 GPIO_ACTIVE_HIGH>;
+        gpio4_02-gpio   = <&gpio4  2 GPIO_ACTIVE_HIGH>;
+        gpio4_03-gpio   = <&gpio4  3 GPIO_ACTIVE_HIGH>;
+        gpio4_04-gpio   = <&gpio4  4 GPIO_ACTIVE_HIGH>;
+        */
     };
 
     /*
@@ -944,17 +965,14 @@ pinctrl-0 = <&pinctrl_uart4>, <&pinctrl_uart4_ext>, <&pinctrl_bt>;
 
         exp1 {
             gpios = <&gpio4 3 GPIO_ACTIVE_HIGH>;
-            output-low;
         };
 
         exp2 {
             gpios = <&gpio4 4 GPIO_ACTIVE_HIGH>;
-            output-low;
         };
 
         exp3 {
             gpios = <&gpio4 2 GPIO_ACTIVE_HIGH>;
-            output-low;
         };
     };
 
@@ -995,6 +1013,7 @@ pinctrl-0 = <&pinctrl_uart4>, <&pinctrl_uart4_ext>, <&pinctrl_bt>;
         };
     };
 
+    /*
     gpio-cellmodem {
         pinctrl-names = "default";
         pinctrl-0 = <&pinctrl_cellmodem>;
@@ -1011,6 +1030,7 @@ pinctrl-0 = <&pinctrl_uart4>, <&pinctrl_uart4_ext>, <&pinctrl_bt>;
             gpios = <&gpio5 3 GPIO_ACTIVE_HIGH>;
         };
     };
+    */
 
     /*
     // Reserved for m4 CPU
