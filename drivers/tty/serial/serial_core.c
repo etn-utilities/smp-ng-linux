@@ -1463,6 +1463,16 @@ out:
 	return ret;
 }
 
+static long
+uart_ioctl32(struct tty_struct *tty, unsigned int cmd, unsigned long arg)
+{
+    long retVal;
+
+    retVal = (long)uart_ioctl(tty, cmd, arg);
+    return retVal;
+}
+
+
 static void uart_set_ldisc(struct tty_struct *tty)
 {
 	struct uart_state *state = tty->driver_data;
@@ -2477,6 +2487,7 @@ static const struct tty_operations uart_ops = {
 	.chars_in_buffer= uart_chars_in_buffer,
 	.flush_buffer	= uart_flush_buffer,
 	.ioctl		= uart_ioctl,
+    .compat_ioctl = uart_ioctl32,
 	.throttle	= uart_throttle,
 	.unthrottle	= uart_unthrottle,
 	.send_xchar	= uart_send_xchar,
