@@ -241,6 +241,95 @@ static int debug = -1;
 module_param(debug, int, 0);
 MODULE_PARM_DESC(debug, "Debug level (0=none,...,16=all)");
 
+static ssize_t show_adapter_type(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	struct pci_dev *pdev = to_pci_dev(dev);
+	struct net_device *netdev = pci_get_drvdata(pdev);
+	struct igb_adapter *adapter = netdev_priv(netdev);
+	struct e1000_hw hw = adapter->hw;
+
+	const char* type = "unknown";
+	switch (hw.phy.media_type)
+	{
+	case e1000_media_type_copper:
+		type = "copper";
+		break;
+	case e1000_media_type_fiber:
+	case e1000_media_type_internal_serdes:
+		type = "fiber";
+		break;
+	default: //already set to unknown
+		break;
+	}
+
+	return scnprintf(buf, PAGE_SIZE, "%s\n", type);
+}
+
+static ssize_t show_vendor_name(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	struct pci_dev *pdev = to_pci_dev(dev);
+	struct net_device *netdev = pci_get_drvdata(pdev);
+	struct igb_adapter *adapter = netdev_priv(netdev);
+	struct e1000_hw hw = adapter->hw;
+	return scnprintf(buf, PAGE_SIZE, "%s\n", hw.sfp_vendorName);
+}
+
+static ssize_t show_vendor_pn(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	struct pci_dev *pdev = to_pci_dev(dev);
+	struct net_device *netdev = pci_get_drvdata(pdev);
+	struct igb_adapter *adapter = netdev_priv(netdev);
+	struct e1000_hw hw = adapter->hw;
+	return scnprintf(buf, PAGE_SIZE, "%s\n", hw.sfp_vendorPn);
+}
+
+static ssize_t show_vendor_sn(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	struct pci_dev *pdev = to_pci_dev(dev);
+	struct net_device *netdev = pci_get_drvdata(pdev);
+	struct igb_adapter *adapter = netdev_priv(netdev);
+	struct e1000_hw hw = adapter->hw;
+	return scnprintf(buf, PAGE_SIZE, "%s\n", hw.sfp_vendorSn);
+}
+
+static ssize_t show_vendor_dc(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	struct pci_dev *pdev = to_pci_dev(dev);
+	struct net_device *netdev = pci_get_drvdata(pdev);
+	struct igb_adapter *adapter = netdev_priv(netdev);
+	struct e1000_hw hw = adapter->hw;
+	return scnprintf(buf, PAGE_SIZE, "%s\n", hw.sfp_vendorDc);
+}
+
+static ssize_t show_vendor_rev(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	struct pci_dev *pdev = to_pci_dev(dev);
+	struct net_device *netdev = pci_get_drvdata(pdev);
+	struct igb_adapter *adapter = netdev_priv(netdev);
+	struct e1000_hw hw = adapter->hw;
+	return scnprintf(buf, PAGE_SIZE, "%s\n", hw.sfp_vendorRev);
+}
+
+DEVICE_ATTR(adapter_type, 0444, show_adapter_type, NULL);
+DEVICE_ATTR(vendor_name, 0444, show_vendor_name, NULL);
+DEVICE_ATTR(vendor_pn, 0444, show_vendor_pn, NULL);
+DEVICE_ATTR(vendor_sn, 0444, show_vendor_sn, NULL);
+DEVICE_ATTR(vendor_dc, 0444, show_vendor_dc, NULL);
+DEVICE_ATTR(vendor_rev, 0444, show_vendor_rev, NULL);
+
+static struct attribute *igb_attrs[] = {
+    &dev_attr_adapter_type.attr,
+    &dev_attr_vendor_name.attr,
+    &dev_attr_vendor_pn.attr,
+    &dev_attr_vendor_sn.attr,
+    &dev_attr_vendor_dc.attr,
+    &dev_attr_vendor_rev.attr,
+    NULL
+};
+static const struct attribute_group igb_group = {
+    .attrs = igb_attrs,
+};
+
 struct igb_reg_info {
 	u32 ofs;
 	char *name;
@@ -3597,12 +3686,19 @@ static int igb_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 			break;
 		}
 	}
+	err = sysfs_create_group(&pdev->dev.kobj, &igb_group);
+	if (err < 0)
+	{
+		dev_err(&pdev->dev, "failed to create syfs attribute group\n");
+		goto err_sysfs_create_group;
+	}
 
 	dev_pm_set_driver_flags(&pdev->dev, DPM_FLAG_NO_DIRECT_COMPLETE);
 
 	pm_runtime_put_noidle(&pdev->dev);
 	return 0;
 
+err_sysfs_create_group:
 err_register:
 	igb_release_hw_control(adapter);
 	memset(&adapter->i2c_adap, 0, sizeof(adapter->i2c_adap));
