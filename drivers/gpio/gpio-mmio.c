@@ -60,64 +60,64 @@ o        `                     ~~~~\___/~~~~    ` controller in FPGA is ,.`
 #include <linux/of.h>
 #include <linux/of_device.h>
 
-static void bgpio_write8(void __iomem *reg, unsigned long data, void __iomem *pSem)
+static void bgpio_write8(void __iomem *reg, unsigned long data)
 {
 	writeb(data, reg);
 }
 
-static unsigned long bgpio_read8(void __iomem *reg, void __iomem *pSem)
+static unsigned long bgpio_read8(void __iomem *reg)
 {
 	return readb(reg);
 }
 
-static void bgpio_write16(void __iomem *reg, unsigned long data, void __iomem *pSem)
+static void bgpio_write16(void __iomem *reg, unsigned long data)
 {
 	writew(data, reg);
 }
 
-static unsigned long bgpio_read16(void __iomem *reg, void __iomem *pSem)
+static unsigned long bgpio_read16(void __iomem *reg)
 {
 	return readw(reg);
 }
 
-static void bgpio_write32(void __iomem *reg, unsigned long data, void __iomem *pSem)
+static void bgpio_write32(void __iomem *reg, unsigned long data)
 {
 	writel(data, reg);
 }
 
-static unsigned long bgpio_read32(void __iomem *reg, void __iomem *pSem)
+static unsigned long bgpio_read32(void __iomem *reg)
 {
 	return readl(reg);
 }
 
 #if BITS_PER_LONG >= 64
-static void bgpio_write64(void __iomem *reg, unsigned long data, void __iomem *pSem)
+static void bgpio_write64(void __iomem *reg, unsigned long data)
 {
 	writeq(data, reg);
 }
 
-static unsigned long bgpio_read64(void __iomem *reg, void __iomem *pSem)
+static unsigned long bgpio_read64(void __iomem *reg)
 {
 	return readq(reg);
 }
 #endif /* BITS_PER_LONG >= 64 */
 
-static void bgpio_write16be(void __iomem *reg, unsigned long data, void __iomem *pSem)
+static void bgpio_write16be(void __iomem *reg, unsigned long data)
 {
 	iowrite16be(data, reg);
 }
 
-static unsigned long bgpio_read16be(void __iomem *reg, void __iomem *pSem)
+static unsigned long bgpio_read16be(void __iomem *reg)
 {
 	return ioread16be(reg);
 }
 
-static void bgpio_write32be(void __iomem *reg, unsigned long data, void __iomem *pSem)
+static void bgpio_write32be(void __iomem *reg, unsigned long data)
 {
 	iowrite32be(data, reg);
 }
 
-static unsigned long bgpio_read32be(void __iomem *reg, void __iomem *pSem)
+static unsigned long bgpio_read32be(void __iomem *reg)
 {
 	return ioread32be(reg);
 }
@@ -134,17 +134,10 @@ static int bgpio_get_set(struct gpio_chip *gc, unsigned int gpio)
 	unsigned long pinmask = bgpio_line2mask(gc, gpio);
 	bool dir = !!(gc->bgpio_dir & pinmask);
 
-    #if 0
-    printk(KERN_INFO "%s  (%d)  %s:  %s  gpio: %08x\n"
-        , __FILE__ , __LINE__, __func__
-		, gc->label, gpio
-    );
-    #endif
-
-    if (dir)
-		return !!(gc->read_regSem(gc->reg_set, gc->pSem) & pinmask);
+	if (dir)
+		return !!(gc->read_reg(gc->reg_set) & pinmask);
 	else
-		return !!(gc->read_regSem(gc->reg_dat, gc->pSem) & pinmask);
+		return !!(gc->read_reg(gc->reg_dat) & pinmask);
 }
 
 /*
@@ -164,30 +157,16 @@ static int bgpio_get_set_multiple(struct gpio_chip *gc, unsigned long *mask,
 	get_mask = *mask & ~gc->bgpio_dir;
 
 	if (set_mask)
-		*bits |= gc->read_regSem(gc->reg_set, gc->pSem) & set_mask;
+		*bits |= gc->read_reg(gc->reg_set) & set_mask;
 	if (get_mask)
-		*bits |= gc->read_regSem(gc->reg_dat, gc->pSem) & get_mask;
-
-    #if 0
-    printk(KERN_INFO "%s  (%d)  %s:  %s\n"
-        , __FILE__ , __LINE__, __func__
-		, gc->label
-    );
-    #endif
+		*bits |= gc->read_reg(gc->reg_dat) & get_mask;
 
 	return 0;
 }
 
 static int bgpio_get(struct gpio_chip *gc, unsigned int gpio)
-{      
-    #if 0
-    printk(KERN_INFO "%s  (%d)  %s:  %s  gpio: %08x\n"
-        , __FILE__ , __LINE__, __func__
-		, gc->label, gpio
-    );
-    #endif
-
-    return !!(gc->read_regSem(gc->reg_dat, gc->pSem) & bgpio_line2mask(gc, gpio));
+{
+	return !!(gc->read_reg(gc->reg_dat) & bgpio_line2mask(gc, gpio));
 }
 
 /*
@@ -196,16 +175,9 @@ static int bgpio_get(struct gpio_chip *gc, unsigned int gpio)
 static int bgpio_get_multiple(struct gpio_chip *gc, unsigned long *mask,
 			      unsigned long *bits)
 {
-    #if 0
-    printk(KERN_INFO "%s  (%d)  %s:  %s\n"
-        , __FILE__ , __LINE__, __func__
-		, gc->label
-    );
-    #endif
-
 	/* Make sure we first clear any bits that are zero when we read the register */
 	*bits &= ~*mask;
-    *bits |= gc->read_regSem(gc->reg_dat, gc->pSem) & *mask;
+	*bits |= gc->read_reg(gc->reg_dat) & *mask;
 	return 0;
 }
 
@@ -227,7 +199,7 @@ static int bgpio_get_multiple_be(struct gpio_chip *gc, unsigned long *mask,
 		readmask |= bgpio_line2mask(gc, bit);
 
 	/* Read the register */
-    val = gc->read_regSem(gc->reg_dat, gc->pSem) & readmask;
+	val = gc->read_reg(gc->reg_dat) & readmask;
 
 	/*
 	 * Mirror the result into the "bits" result, this will give line 0
@@ -250,23 +222,14 @@ static void bgpio_set(struct gpio_chip *gc, unsigned int gpio, int val)
 
 	spin_lock_irqsave(&gc->bgpio_lock, flags);
 
-	gc->bgpio_data = gc->read_regSem(gc->reg_dat, gc->pSem);
-
 	if (val)
 		gc->bgpio_data |= mask;
 	else
 		gc->bgpio_data &= ~mask;
 
-	gc->write_regSem(gc->reg_dat, gc->bgpio_data, gc->pSem);
+	gc->write_reg(gc->reg_dat, gc->bgpio_data);
 
 	spin_unlock_irqrestore(&gc->bgpio_lock, flags);
-
-    #if 0
-    printk(KERN_INFO "%s  (%d)  %s:  %s  gpio: %08x  %d\n"
-        , __FILE__ , __LINE__, __func__
-		, gc->label, gpio, val
-    );
-    #endif
 }
 
 static void bgpio_set_with_clear(struct gpio_chip *gc, unsigned int gpio,
@@ -274,17 +237,10 @@ static void bgpio_set_with_clear(struct gpio_chip *gc, unsigned int gpio,
 {
 	unsigned long mask = bgpio_line2mask(gc, gpio);
 
-    #if 0
-    printk(KERN_INFO "%s  (%d)  %s:  %s  gpio: %08x\n"
-        , __FILE__ , __LINE__, __func__
-		, gc->label, gpio
-    );
-    #endif
-
 	if (val)
-		gc->write_regSem(gc->reg_set, mask, gc->pSem);
+		gc->write_reg(gc->reg_set, mask);
 	else
-		gc->write_regSem(gc->reg_clr, mask, gc->pSem);
+		gc->write_reg(gc->reg_clr, mask);
 }
 
 static void bgpio_set_set(struct gpio_chip *gc, unsigned int gpio, int val)
@@ -294,26 +250,14 @@ static void bgpio_set_set(struct gpio_chip *gc, unsigned int gpio, int val)
 
 	spin_lock_irqsave(&gc->bgpio_lock, flags);
 
-	if (!(flags & BGPIOF_UNREADABLE_REG_SET))
-		gc->bgpio_data = gc->read_regSem(gc->reg_set, gc->pSem);
-	else 
-		gc->bgpio_data = gc->read_regSem(gc->reg_dat, gc->pSem);
-
 	if (val)
 		gc->bgpio_data |= mask;
 	else
 		gc->bgpio_data &= ~mask;
 
-	gc->write_regSem(gc->reg_set, gc->bgpio_data, gc->pSem);
+	gc->write_reg(gc->reg_set, gc->bgpio_data);
 
 	spin_unlock_irqrestore(&gc->bgpio_lock, flags);
-
-    #if 0
-    printk(KERN_INFO "%s  (%d)  %s:  %s  gpio: %08x  %d\n"
-        , __FILE__ , __LINE__, __func__
-		, gc->label, gpio, val
-    );
-    #endif
 }
 
 static void bgpio_multiple_get_masks(struct gpio_chip *gc,
@@ -322,13 +266,6 @@ static void bgpio_multiple_get_masks(struct gpio_chip *gc,
 				     unsigned long *clear_mask)
 {
 	int i;
-
-    #if 0
-    printk(KERN_INFO "%s  (%d)  %s:  %s\n"
-        , __FILE__ , __LINE__, __func__
-		, gc->label
-    );
-    #endif
 
 	*set_mask = 0;
 	*clear_mask = 0;
@@ -353,24 +290,12 @@ static void bgpio_set_multiple_single_reg(struct gpio_chip *gc,
 
 	bgpio_multiple_get_masks(gc, mask, bits, &set_mask, &clear_mask);
 
-	if (gc->set == bgpio_set_set &&	!(flags & BGPIOF_UNREADABLE_REG_SET))
-		gc->bgpio_data = gc->read_regSem(gc->reg_set, gc->pSem);
-	else 
-		gc->bgpio_data = gc->read_regSem(gc->reg_dat, gc->pSem);
-
 	gc->bgpio_data |= set_mask;
 	gc->bgpio_data &= ~clear_mask;
 
-	gc->write_regSem(reg, gc->bgpio_data, gc->pSem);
+	gc->write_reg(reg, gc->bgpio_data);
 
 	spin_unlock_irqrestore(&gc->bgpio_lock, flags);
-
-    #if 0
-    printk(KERN_INFO "%s  (%d)  %s:  %s  s:%08x  c:%08x\n"
-        , __FILE__ , __LINE__, __func__
-		, gc->label, set_mask, clear_mask
-    );
-    #endif
 }
 
 static void bgpio_set_multiple(struct gpio_chip *gc, unsigned long *mask,
@@ -391,19 +316,12 @@ static void bgpio_set_multiple_with_clear(struct gpio_chip *gc,
 {
 	unsigned long set_mask, clear_mask;
 
-    #if 0
-    printk(KERN_INFO "%s  (%d)  %s:  %s\n"
-        , __FILE__ , __LINE__, __func__
-		, gc->label
-    );
-    #endif
-
 	bgpio_multiple_get_masks(gc, mask, bits, &set_mask, &clear_mask);
 
 	if (set_mask)
-		gc->write_regSem(gc->reg_set, set_mask, gc->pSem);
+		gc->write_reg(gc->reg_set, set_mask);
 	if (clear_mask)
-		gc->write_regSem(gc->reg_clr, clear_mask, gc->pSem);
+		gc->write_reg(gc->reg_clr, clear_mask);
 }
 
 static int bgpio_simple_dir_in(struct gpio_chip *gc, unsigned int gpio)
@@ -431,24 +349,12 @@ static int bgpio_dir_in(struct gpio_chip *gc, unsigned int gpio)
 
 	spin_lock_irqsave(&gc->bgpio_lock, flags);
 
-	if (gc->reg_dir_out)
-		gc->bgpio_dir = gc->read_regSem(gc->reg_dir_out, gc->pSem);
-	else if (gc->reg_dir_in)
-		gc->bgpio_dir = ~gc->read_regSem(gc->reg_dir_in, gc->pSem);
-
 	gc->bgpio_dir &= ~bgpio_line2mask(gc, gpio);
 
-    #if 0
-    printk(KERN_INFO "%s  (%d)  %s:  %s  GPIO DIR: %08x  gpio: %08x\n"
-        , __FILE__ , __LINE__, __func__
-		, gc->label, gc->bgpio_dir, gpio
-    );
-    #endif
-
 	if (gc->reg_dir_in)
-		gc->write_regSem(gc->reg_dir_in, ~gc->bgpio_dir, gc->pSem);
+		gc->write_reg(gc->reg_dir_in, ~gc->bgpio_dir);
 	if (gc->reg_dir_out)
-		gc->write_regSem(gc->reg_dir_out, gc->bgpio_dir, gc->pSem);
+		gc->write_reg(gc->reg_dir_out, gc->bgpio_dir);
 
 	spin_unlock_irqrestore(&gc->bgpio_lock, flags);
 
@@ -465,13 +371,13 @@ static int bgpio_get_dir(struct gpio_chip *gc, unsigned int gpio)
 	}
 
 	if (gc->reg_dir_out) {
-		if (gc->read_regSem(gc->reg_dir_out, gc->pSem) & bgpio_line2mask(gc, gpio))
+		if (gc->read_reg(gc->reg_dir_out) & bgpio_line2mask(gc, gpio))
 			return GPIO_LINE_DIRECTION_OUT;
 		return GPIO_LINE_DIRECTION_IN;
 	}
 
 	if (gc->reg_dir_in)
-		if (!(gc->read_regSem(gc->reg_dir_in, gc->pSem) & bgpio_line2mask(gc, gpio)))
+		if (!(gc->read_reg(gc->reg_dir_in) & bgpio_line2mask(gc, gpio)))
 			return GPIO_LINE_DIRECTION_OUT;
 
 	return GPIO_LINE_DIRECTION_IN;
@@ -483,24 +389,12 @@ static void bgpio_dir_out(struct gpio_chip *gc, unsigned int gpio, int val)
 
 	spin_lock_irqsave(&gc->bgpio_lock, flags);
 
-	if (gc->reg_dir_out)
-		gc->bgpio_dir = gc->read_regSem(gc->reg_dir_out, gc->pSem);
-	else if (gc->reg_dir_in)
-		gc->bgpio_dir = ~gc->read_regSem(gc->reg_dir_in, gc->pSem);
-
 	gc->bgpio_dir |= bgpio_line2mask(gc, gpio);
 
-    #if 0
-    printk(KERN_INFO "%s  (%d)  %s:  %s  GPIO DIR: %08x  gpio: %08x\n"
-        , __FILE__ , __LINE__, __func__
-		, gc->label, gc->bgpio_dir, gpio
-    );
-    #endif
-
 	if (gc->reg_dir_in)
-		gc->write_regSem(gc->reg_dir_in, ~gc->bgpio_dir, gc->pSem);
+		gc->write_reg(gc->reg_dir_in, ~gc->bgpio_dir);
 	if (gc->reg_dir_out)
-		gc->write_regSem(gc->reg_dir_out, gc->bgpio_dir, gc->pSem);
+		gc->write_reg(gc->reg_dir_out, gc->bgpio_dir);
 
 	spin_unlock_irqrestore(&gc->bgpio_lock, flags);
 }
@@ -528,25 +422,25 @@ static int bgpio_setup_accessors(struct device *dev,
 
 	switch (gc->bgpio_bits) {
 	case 8:
-		gc->read_regSem     = bgpio_read8;
-		gc->write_regSem    = bgpio_write8;
+		gc->read_reg	= bgpio_read8;
+		gc->write_reg	= bgpio_write8;
 		break;
 	case 16:
 		if (byte_be) {
-			gc->read_regSem	    = bgpio_read16be;
-			gc->write_regSem    = bgpio_write16be;
+			gc->read_reg	= bgpio_read16be;
+			gc->write_reg	= bgpio_write16be;
 		} else {
-			gc->read_regSem	    = bgpio_read16;
-			gc->write_regSem    = bgpio_write16;
+			gc->read_reg	= bgpio_read16;
+			gc->write_reg	= bgpio_write16;
 		}
 		break;
 	case 32:
 		if (byte_be) {
-			gc->read_regSem     = bgpio_read32be;
-			gc->write_regSem    = bgpio_write32be;
+			gc->read_reg	= bgpio_read32be;
+			gc->write_reg	= bgpio_write32be;
 		} else {
-			gc->read_regSem	    = bgpio_read32;
-			gc->write_regSem    = bgpio_write32;
+			gc->read_reg	= bgpio_read32;
+			gc->write_reg	= bgpio_write32;
 		}
 		break;
 #if BITS_PER_LONG >= 64
@@ -556,8 +450,8 @@ static int bgpio_setup_accessors(struct device *dev,
 				"64 bit big endian byte order unsupported\n");
 			return -EINVAL;
 		} else {
-			gc->read_regSem     = bgpio_read64;
-			gc->write_regSem    = bgpio_write64;
+			gc->read_reg	= bgpio_read64;
+			gc->write_reg	= bgpio_write64;
 		}
 		break;
 #endif /* BITS_PER_LONG >= 64 */
@@ -708,7 +602,6 @@ int bgpio_init(struct gpio_chip *gc, struct device *dev,
 	       unsigned long flags)
 {
 	int ret;
-    int initByParent = 0;
 
 	if (!is_power_of_2(sz))
 		return -EINVAL;
@@ -725,39 +618,22 @@ int bgpio_init(struct gpio_chip *gc, struct device *dev,
 	gc->request = bgpio_request;
 	gc->be_bits = !!(flags & BGPIOF_BIG_ENDIAN);
 
-    if (dev_is_platform(dev)) {
-        struct platform_device *pdev = to_platform_device(dev);
-        if (strncmp(pdev->id_entry->name, "imx35-gpio", 10) == 0) {
-            printk(KERN_INFO "%s  (%d)  %s:   %.20s  %08x\n"
-                , __FILE__ , __LINE__, __func__
-                , pdev->id_entry->name
-                , (u32)gc->pSem
-            );
-            initByParent = 1;
-        }
-    }
-    if (!initByParent) {
-        gc->pSem = 0;
-    }
-
 	ret = bgpio_setup_io(gc, dat, set, clr, flags);
 	if (ret)
 		return ret;
 
-    if (!initByParent) {
-        ret = bgpio_setup_accessors(dev, gc, flags & BGPIOF_BIG_ENDIAN_BYTE_ORDER);
-        if (ret)
-            return ret;
-    }
+	ret = bgpio_setup_accessors(dev, gc, flags & BGPIOF_BIG_ENDIAN_BYTE_ORDER);
+	if (ret)
+		return ret;
 
 	ret = bgpio_setup_direction(gc, dirout, dirin, flags);
 	if (ret)
 		return ret;
 
-	gc->bgpio_data = gc->read_regSem(gc->reg_dat, gc->pSem);
+	gc->bgpio_data = gc->read_reg(gc->reg_dat);
 	if (gc->set == bgpio_set_set &&
 			!(flags & BGPIOF_UNREADABLE_REG_SET))
-		gc->bgpio_data = gc->read_regSem(gc->reg_set, gc->pSem);
+		gc->bgpio_data = gc->read_reg(gc->reg_set);
 
 	if (flags & BGPIOF_UNREADABLE_REG_DIR)
 		gc->bgpio_dir_unreadable = true;
@@ -768,9 +644,9 @@ int bgpio_init(struct gpio_chip *gc, struct device *dev,
 	if ((gc->reg_dir_out || gc->reg_dir_in) &&
 	    !(flags & BGPIOF_UNREADABLE_REG_DIR)) {
 		if (gc->reg_dir_out)
-			gc->bgpio_dir = gc->read_regSem(gc->reg_dir_out, gc->pSem);
+			gc->bgpio_dir = gc->read_reg(gc->reg_dir_out);
 		else if (gc->reg_dir_in)
-			gc->bgpio_dir = ~gc->read_regSem(gc->reg_dir_in, gc->pSem);
+			gc->bgpio_dir = ~gc->read_reg(gc->reg_dir_in);
 		/*
 		 * If we have two direction registers, synchronise
 		 * input setting to output setting, the library
@@ -778,10 +654,10 @@ int bgpio_init(struct gpio_chip *gc, struct device *dev,
 		 * the same time.
 		 */
 		if (gc->reg_dir_out && gc->reg_dir_in)
-			gc->write_regSem(gc->reg_dir_in, ~gc->bgpio_dir, gc->pSem);
+			gc->write_reg(gc->reg_dir_in, ~gc->bgpio_dir);
 	}
 
-    return ret;
+	return ret;
 }
 EXPORT_SYMBOL_GPL(bgpio_init);
 

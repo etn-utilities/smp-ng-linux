@@ -1061,13 +1061,6 @@ struct irq_chip_generic {
 	void			*private;
 	unsigned long		installed;
 	unsigned long		unused;
-
-    // Warning: Inserted here. Must not be inserted at end. 
-    // Last member is a pointer to variable lenght data.
-    void    __iomem *pSem;
-	void    (*reg_writelSem)(u32 val, void __iomem *addr, void __iomem *pSem);
-	u32     (*reg_readlSem)(void __iomem *addr, void __iomem *pSem);
-
 	struct irq_domain	*domain;
 	struct list_head	list;
 	struct irq_chip_type	chip_types[];
@@ -1208,8 +1201,6 @@ static inline void irq_reg_writel(struct irq_chip_generic *gc,
 {
 	if (gc->reg_writel)
 		gc->reg_writel(val, gc->reg_base + reg_offset);
-	else if (gc->reg_writelSem) 
-	    gc->reg_writelSem(val, gc->reg_base + reg_offset, gc->pSem);
 	else
 		writel(val, gc->reg_base + reg_offset);
 }
@@ -1219,9 +1210,7 @@ static inline u32 irq_reg_readl(struct irq_chip_generic *gc,
 {
 	if (gc->reg_readl)
 		return gc->reg_readl(gc->reg_base + reg_offset);
-	else if (gc->reg_readlSem) 
-		return gc->reg_readlSem(gc->reg_base + reg_offset, gc->pSem);
-    else
+	else
 		return readl(gc->reg_base + reg_offset);
 }
 
