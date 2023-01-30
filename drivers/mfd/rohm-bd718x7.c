@@ -74,7 +74,7 @@ static struct regmap_irq_chip bd718xx_irq_chip = {
 };
 
 static const struct regmap_range pmic_status_range = {
-	.range_min = BD718XX_REG_REV, 
+	.range_min = BD718XX_REG_IRQ,
 	.range_max = BD718XX_REG_POW_STATE,
 };
 
@@ -122,31 +122,6 @@ static int bd718xx_init_press_duration(struct regmap *regmap,
 			dev_err(dev, "Failed to init pwron long press\n");
 			return ret;
 		}
-	}
-
-	return 0;
-}
-
-static int bd718xx_trig_reset_registers(struct bd718xx *bd718xx)
-{
-	#define COLD_BOOT 0x05
-	#define WARM_BOOT 0x07
-	struct device* dev = bd718xx->chip.dev;
-	int ret;
-	u32 tmp_value = WARM_BOOT;
-
-	printk(
-		KERN_INFO "%s  (%4d): bd718xx:  bd718xx_trig_reset_registers.\n"
-		, __FILE__, __LINE__
-	);
-
-	ret = regmap_update_bits(bd718xx->chip.regmap,
-					BD718XX_REG_SWRESET,
-					BD718XX_SWRESET_TYPE_MASK,
-					tmp_value);
-	if (ret) {
-		dev_err(dev, "Failed to trig BD718XX_REG_SWRESET (%d)\n", ret);
-		return ret;
 	}
 
 	return 0;
@@ -218,28 +193,6 @@ static int bd718xx_i2c_probe(struct i2c_client *i2c,
 	return ret;
 }
 
-static void bd718xx_i2c_shutdown(struct i2c_client *i2c)
-{
-	struct bd718xx *bd718xx;
-
-	printk(
-		KERN_INFO "%s  (%4d): bd718xx:  bd718xx_i2c_shutdown.\n"
-		, __FILE__, __LINE__
-	);
-	bd718xx = dev_get_drvdata(&i2c->dev);
-	bd718xx_trig_reset_registers(bd718xx);
-}
-
-static int bd718xx_i2c_remove(struct i2c_client *i2c)
-{
-	printk(
-		KERN_INFO "%s  (%4d): bd718xx:  bd718xx_i2c_remove.\n"
-		, __FILE__, __LINE__
-	);
-	bd718xx_i2c_shutdown(i2c);
-	return 0;
-}
-
 static const struct of_device_id bd718xx_of_match[] = {
 	{
 		.compatible = "rohm,bd71837",
@@ -263,8 +216,6 @@ static struct i2c_driver bd718xx_i2c_driver = {
 		.of_match_table = bd718xx_of_match,
 	},
 	.probe = bd718xx_i2c_probe,
-	//.remove = bd718xx_i2c_remove,     //Not used on carrier rev2
-	//.shutdown = bd718xx_i2c_shutdown,
 };
 
 static int __init bd718xx_i2c_init(void)
