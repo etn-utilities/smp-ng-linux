@@ -222,10 +222,7 @@ static void bgpio_set(struct gpio_chip *gc, unsigned int gpio, int val)
 
 	spin_lock_irqsave(&gc->bgpio_lock, flags);
 
-	if (!(flags & BGPIOF_UNREADABLE_REG_SET))
-		gc->bgpio_data = gc->read_reg(gc->reg_set);
-	else 
-		gc->bgpio_data = gc->read_reg(gc->reg_dat);
+    gc->bgpio_data = gc->read_reg(gc->reg_dat);
 
 	if (val)
 		gc->bgpio_data |= mask;
@@ -516,6 +513,12 @@ static int bgpio_setup_io(struct gpio_chip *gc,
 			  void __iomem *clr,
 			  unsigned long flags)
 {
+    #if 0
+    printk(KERN_INFO "%s  (%d)  %s:  dat:%08x  set:%08x  clr:%08x  flags:%08x\n"
+        , __FILE__ , __LINE__, __func__
+		, dat, set, clr, flags
+    );
+    #endif
 
 	gc->reg_dat = dat;
 	if (!gc->reg_dat)
