@@ -562,11 +562,6 @@ static int imx8mm_clocks_probe(struct platform_device *pdev)
 	hws[IMX8MM_CLK_ECSPI2_ROOT] = imx_clk_hw_gate4("ecspi2_root_clk", "ecspi2", base + 0x4080, 0);
 	hws[IMX8MM_CLK_ECSPI3_ROOT] = imx_clk_hw_gate4("ecspi3_root_clk", "ecspi3", base + 0x4090, 0);
 	hws[IMX8MM_CLK_ENET1_ROOT] = imx_clk_hw_gate4("enet1_root_clk", "enet_axi", base + 0x40a0, 0);
-
-	hws[IMX8MM_CLK_RDC_ROOT] = imx_clk_hw_gate4("rdc_root_clk", "ipg_root", base + 0x4310, 0);
-	hws[IMX8MM_CLK_SEMA42_1_ROOT] = imx_clk_hw_gate4("sema42_1_root_clk", "ipg_root", base + 0x43D0, 0);
-	hws[IMX8MM_CLK_SEMA42_2_ROOT] = imx_clk_hw_gate4("sema42_2_root_clk", "ipg_root", base + 0x43E0, 0);
-
 	hws[IMX8MM_CLK_GPIO1_ROOT] = imx_clk_hw_gate4("gpio1_root_clk", "ipg_root", base + 0x40b0, 0);
 	hws[IMX8MM_CLK_GPIO2_ROOT] = imx_clk_hw_gate4("gpio2_root_clk", "ipg_root", base + 0x40c0, 0);
 	hws[IMX8MM_CLK_GPIO3_ROOT] = imx_clk_hw_gate4("gpio3_root_clk", "ipg_root", base + 0x40d0, 0);

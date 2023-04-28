@@ -282,10 +282,6 @@
 #define IMX8MM_CLK_CLKOUT2			257
 
 
-#define IMX8MM_CLK_RDC_ROOT				258
-#define IMX8MM_CLK_SEMA42_1_ROOT		259
-#define IMX8MM_CLK_SEMA42_2_ROOT		260
-
-#define IMX8MM_CLK_END				261
+#define IMX8MM_CLK_END				258
 
 #endif
