@@ -392,12 +392,6 @@ static void imx_uart_ucrs_restore(struct imx_port *sport,
 /* called with port.lock taken and irqs caller dependent */
 static void imx_uart_rts_active(struct imx_port *sport, u32 *ucr2)
 {
-    #if 0
-    printk(KERN_INFO "%s  (%d)  %s:\n"
-        , __FILE__ , __LINE__, __func__
-    );
-    #endif
-
 	*ucr2 &= ~(UCR2_CTSC | UCR2_CTS);
 
 	sport->port.mctrl |= TIOCM_RTS;
@@ -407,12 +401,6 @@ static void imx_uart_rts_active(struct imx_port *sport, u32 *ucr2)
 /* called with port.lock taken and irqs caller dependent */
 static void imx_uart_rts_inactive(struct imx_port *sport, u32 *ucr2)
 {
-    #if 0
-    printk(KERN_INFO "%s  (%d)  %s:\n"
-        , __FILE__ , __LINE__, __func__
-    );
-    #endif
-
 	*ucr2 &= ~UCR2_CTSC;
 	*ucr2 |= UCR2_CTS;
 
@@ -481,9 +469,11 @@ static void imx_uart_stop_tx(struct uart_port *port)
 	if (port->rs485.flags & SER_RS485_ENABLED) {
 		if (sport->tx_state == SEND) {
 			sport->tx_state = WAIT_AFTER_SEND;
-			start_hrtimer_ms(&sport->trigger_stop_tx,
-					 port->rs485.delay_rts_after_send);
-			return;
+            if (port->rs485.delay_rts_after_send) {
+                start_hrtimer_ms(&sport->trigger_stop_tx,
+                        port->rs485.delay_rts_after_send);
+                return;
+            }
 		}
 
 		if (sport->tx_state == WAIT_AFTER_RTS ||
@@ -724,9 +714,11 @@ static void imx_uart_start_tx(struct uart_port *port)
 				imx_uart_stop_rx(port);
 
 			sport->tx_state = WAIT_AFTER_RTS;
-			start_hrtimer_ms(&sport->trigger_start_tx,
-					 port->rs485.delay_rts_before_send);
-			return;
+            if (port->rs485.delay_rts_before_send) {
+                start_hrtimer_ms(&sport->trigger_start_tx,
+                        port->rs485.delay_rts_before_send);
+                return;
+            }
 		}
 
 		if (sport->tx_state == WAIT_AFTER_SEND
@@ -2016,6 +2008,8 @@ static int imx_uart_rs485_config(struct uart_port *port,
 		else
 			imx_uart_rts_inactive(sport, &ucr2);
 		imx_uart_writel(sport, ucr2, UCR2);
+
+        sport->tx_state = OFF;
 	}
     else {
         printk(KERN_INFO "%s  (%d)  %s:  RS232 enabled\n"
