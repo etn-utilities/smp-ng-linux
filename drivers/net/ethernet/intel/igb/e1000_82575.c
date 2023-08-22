@@ -570,10 +570,7 @@ static s32 igb_set_sfp_media_type_82575(struct e1000_hw *hw)
             if (timeout) {
                 timeout--;
                 if (timeout == 0) {
-					printk(
-						KERN_INFO "%s  (%4d): I210: SFP not installed or I2C not working.\n"
-						, __FILE__, __LINE__
-					);
+					printk(KERN_DEBUG "%s  (%4d): I210: SFP not installed or I2C not working.\n", __FILE__, __LINE__);
                     goto out;
                 }
 				msleep(100);
@@ -593,41 +590,16 @@ static s32 igb_set_sfp_media_type_82575(struct e1000_hw *hw)
 	memcpy(hw->sfp_vendorDc, &hw->sfp_data[E1000_SFF_VENDOR_DC_OFFSET], E1000_SFF_VENDOR_DC_SIZE);
 	cleanup_str(hw->sfp_vendorDc, E1000_SFF_VENDOR_DC_SIZE);
 
-	printk(
-		KERN_INFO "%s  (%4d):     VENDOR NAME: \"%hs\" \n"
-		, __FILE__, __LINE__
-		, hw->sfp_vendorName
-	);
-	printk(
-		KERN_INFO "%s  (%4d):     PART NUMBER: \"%hs\"\n"
-		, __FILE__, __LINE__
-		, hw->sfp_vendorPn
-	);
-	printk(
-		KERN_INFO "%s  (%4d):             REV: \"%hs\"\n"
-		, __FILE__, __LINE__
-		, hw->sfp_vendorRev
-	);
-	printk(
-		KERN_INFO "%s  (%4d):   SERIAL NUMBER: \"%hs\"\n"
-		, __FILE__, __LINE__
-		, hw->sfp_vendorSn
-	);
-	printk(
-		KERN_INFO "%s  (%4d):       DATE CODE: \"%hs\"\n"
-		, __FILE__, __LINE__
-		, hw->sfp_vendorDc
-	);
+	printk(KERN_DEBUG "%s  (%4d):     VENDOR NAME: \"%hs\"\n", __FILE__, __LINE__, hw->sfp_vendorName);
+	printk(KERN_DEBUG "%s  (%4d):     PART NUMBER: \"%hs\"\n", __FILE__, __LINE__, hw->sfp_vendorPn);
+	printk(KERN_DEBUG "%s  (%4d):             REV: \"%hs\"\n", __FILE__, __LINE__, hw->sfp_vendorRev);
+	printk(KERN_DEBUG "%s  (%4d):   SERIAL NUMBER: \"%hs\"\n", __FILE__, __LINE__, hw->sfp_vendorSn);
+	printk(KERN_DEBUG "%s  (%4d):       DATE CODE: \"%hs\"\n", __FILE__, __LINE__, hw->sfp_vendorDc);
 
 	tranceiver_type = hw->sfp_data[E1000_SFF_IDENTIFIER_OFFSET];
 	*(u8*)eth_flags = hw->sfp_data[E1000_SFF_ETH_FLAGS_OFFSET];
 
-	printk(
-		KERN_INFO "%s  (%4d): TRANSCEIVER TYPE: %x\n"
-		, __FILE__, __LINE__
-		, tranceiver_type
-	);
-
+	printk(KERN_DEBUG "%s  (%4d): TRANSCEIVER TYPE: %x\n", __FILE__, __LINE__, tranceiver_type);
 
 	//  Bit      Standard                    I210 mode
 	//  0        10000BASE-SX                SERDES, no autoneg
@@ -639,11 +611,7 @@ static s32 igb_set_sfp_media_type_82575(struct e1000_hw *hw)
 	//
 	//  NOTE: I210 configured with SGMII flash by default. Must reconfigure for SERDES mode.
 	//
-	printk(
-		KERN_INFO "%s  (%4d): GIGABIT ETHERNET COMPLIANCE CODE = %x\n"
-		, __FILE__, __LINE__
-		, eth_flags
-	);
+	printk(KERN_DEBUG "%s  (%4d): GIGABIT ETHERNET COMPLIANCE CODE = %x\n", __FILE__, __LINE__, eth_flags);
 
 	/* Fix for incorrect modules types reported */
 	tranceiver_type = E1000_SFF_IDENTIFIER_SFP;
@@ -659,39 +627,24 @@ static s32 igb_set_sfp_media_type_82575(struct e1000_hw *hw)
 
             //ctrl_ext &= ~E1000_CTRL_EXT_LINK_MODE_MASK;
             //ctrl_ext |= E1000_CTRL_EXT_LINK_MODE_1000BASE_KX;
-			printk(
-				KERN_INFO "%s  (%4d): %s\n"
-				, __FILE__, __LINE__, eth_flags->e1000_base_sx ? "I210: 1000BASE-SX [SERDES]" : "I210: 1000BASE-LX [SERDES]"
-			);
+			printk(KERN_DEBUG "%s  (%4d): %s\n", __FILE__, __LINE__, eth_flags->e1000_base_sx ? "I210: 1000BASE-SX [SERDES]" : "I210: 1000BASE-LX [SERDES]");
 		} else if (eth_flags->e100_base_fx || eth_flags->e100_base_lx) {
 			dev_spec->sgmii_active = true;
 			hw->phy.media_type = e1000_media_type_internal_serdes;
-			printk(
-				KERN_INFO "%s  (%4d): %s\n"
-				, __FILE__, __LINE__, eth_flags->e100_base_fx ? "I210: 100BASE-FX [SGMII]" : "I210: 100BASE-LX [SGMII]"
-			);
+			printk(KERN_DEBUG "%s  (%4d): %s\n", __FILE__, __LINE__, eth_flags->e100_base_fx ? "I210: 100BASE-FX [SGMII]" : "I210: 100BASE-LX [SGMII]");
 		} else if (eth_flags->e1000_base_t) {
 			dev_spec->sgmii_active = true;
 			hw->phy.media_type = e1000_media_type_copper;
-			printk(
-				KERN_INFO "%s  (%4d): PHY 1000BASE-T [SGMII]\n"
-				, __FILE__, __LINE__
-			);
+			printk(KERN_DEBUG "%s  (%4d): PHY 1000BASE-T [SGMII]\n", __FILE__, __LINE__);
 		} else {
 			hw->phy.media_type = e1000_media_type_unknown;
 			hw_dbg("PHY module has not been recognized\n");
-			printk(
-				KERN_INFO "%s  (%4d): I210: PHY module has not been recognized\n"
-				, __FILE__, __LINE__
-			);
+			printk(KERN_DEBUG "%s  (%4d): I210: PHY module has not been recognized\n", __FILE__, __LINE__);
 			goto out;
 		}
 	} else {
 		hw->phy.media_type = e1000_media_type_unknown;
-		printk(
-			KERN_INFO "%s  (%4d): I210: PHY module unknown\n"
-			, __FILE__, __LINE__
-		);
+		printk(KERN_DEBUG "%s  (%4d): I210: PHY module unknown\n", __FILE__, __LINE__);
 	}
 	ret_val = 0;
 out:
@@ -3073,4 +3026,3 @@ const struct e1000_info e1000_82575_info = {
 	.phy_ops = &e1000_phy_ops_82575,
 	.nvm_ops = &e1000_nvm_ops_82575,
 };
-
