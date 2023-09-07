@@ -3937,6 +3937,20 @@ fec_probe(struct platform_device *pdev)
 		fep->phy_interface = interface;
 	}
 
+	{
+		//!!! Patch for external clock iomux pad config
+	    printk(KERN_INFO "fec_probe: fec mode: %d\n", fep->phy_interface);
+		u32 *pGpr1 = ioremap(0x30340004, 1);
+		u32 gpr1 = readl(pGpr1);
+	    printk(KERN_INFO "fec_probe: GPR1 bits: 0x%08x\n", gpr1);
+		if (fep->phy_interface == PHY_INTERFACE_MODE_RMII) {
+			gpr1 |= (1<<13);
+			writel(gpr1, pGpr1);
+			gpr1 = readl(pGpr1);
+		    printk(KERN_INFO "fec_probe: GPR1 bits (13 must be 1): 0x%08x\n", gpr1);
+		}
+	}
+
 	ret = fec_enet_parse_rgmii_delay(fep, np);
 	if (ret)
 		goto failed_rgmii_delay;

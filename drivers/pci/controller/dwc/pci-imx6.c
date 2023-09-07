@@ -164,6 +164,8 @@ struct imx6_pcie {
 	const struct imx6_pcie_drvdata *drvdata;
 	struct regulator	*epdev_on;
 	struct phy		*phy;
+
+	u32			phy_reg64;
 };
 
 /* Parameters for the waiting for PCIe PHY PLL to lock on i.MX7 */
@@ -1522,6 +1524,24 @@ static void imx6_pcie_init_phy(struct imx6_pcie *imx6_pcie)
 					   IMX8MM_GPR_PCIE_REF_CLK_SEL,
 					   IMX8MM_GPR_PCIE_REF_CLK_EXT);
 			udelay(100);
+
+            // Override CMN_REG064 register
+            if (imx6_pcie->phy_reg64 != -1) {
+                u32 tmp;
+
+    			tmp = readl(imx6_pcie->phy_base + PCIE_PHY_CMN_REG64);
+                dev_info(imx6_pcie->pci->dev, "PCIE_PHY_CMN_REG64 init val: %xh.\n", tmp);
+
+    			tmp = readl(imx6_pcie->phy_base + 0x194);
+                dev_info(imx6_pcie->pci->dev, "PCIE_PHY_CMN_REG65 init val: %xh.\n", tmp);
+
+                writel(imx6_pcie->phy_reg64, imx6_pcie->phy_base + PCIE_PHY_CMN_REG64);
+                dev_info(imx6_pcie->pci->dev, "PCIE_PHY_CMN_REG64 override: %xh.\n", imx6_pcie->phy_reg64);
+
+                writel(0xF9, imx6_pcie->phy_base + 0x194);
+                dev_info(imx6_pcie->pci->dev, "PCIE_PHY_CMN_REG65 override: %xh.\n", 0xF9);
+            }
+
 			/* Do the PHY common block reset */
 			regmap_update_bits(imx6_pcie->iomuxc_gpr, offset,
 					   IMX8MM_GPR_PCIE_CMN_RST,
@@ -2394,6 +2414,9 @@ static int imx6_pcie_probe(struct platform_device *pdev)
 	pci->dbi_base = devm_ioremap_resource(dev, dbi_base);
 	if (IS_ERR(pci->dbi_base))
 		return PTR_ERR(pci->dbi_base);
+
+	if (of_property_read_u32(node, "phy-reg64", &imx6_pcie->phy_reg64))
+		imx6_pcie->phy_reg64 = -1;
 
 	if (of_property_read_u32(node, "hsio-cfg", &imx6_pcie->hsio_cfg))
 		imx6_pcie->hsio_cfg = 0;

@@ -63,6 +63,19 @@ struct e1000_hw;
 #define E1000_ALT_MAC_ADDRESS_OFFSET_LAN2   6
 #define E1000_ALT_MAC_ADDRESS_OFFSET_LAN3   9
 
+#if 1
+#define E1000_SFF_VENDOR_NAME_OFFSET 20
+#define E1000_SFF_VENDOR_NAME_SIZE   16
+#define E1000_SFF_VENDOR_PN_OFFSET   40
+#define E1000_SFF_VENDOR_PN_SIZE     16
+#define E1000_SFF_VENDOR_REV_OFFSET  56
+#define E1000_SFF_VENDOR_REV_SIZE    4
+#define E1000_SFF_VENDOR_SN_OFFSET   68
+#define E1000_SFF_VENDOR_SN_SIZE     16
+#define E1000_SFF_VENDOR_DC_OFFSET   84
+#define E1000_SFF_VENDOR_DC_SIZE     8
+#endif
+
 enum e1000_mac_type {
 	e1000_undefined = 0,
 	e1000_82575,
@@ -539,6 +552,19 @@ struct e1000_hw {
 	u16 vendor_id;
 
 	u8  revision_id;
+
+	#if 1
+	//!!! SFP Info
+    u32 sfp_error_led_and_mask;
+    u32 sfp_error_led_or_mask;
+    u8  sfp_dataSize;
+    u8  sfp_data[128];
+    char sfp_vendorName[E1000_SFF_VENDOR_NAME_SIZE + 1];
+    char sfp_vendorPn[E1000_SFF_VENDOR_PN_SIZE + 1];
+    char sfp_vendorRev[E1000_SFF_VENDOR_REV_SIZE + 1];
+    char sfp_vendorSn[E1000_SFF_VENDOR_SN_SIZE + 1];
+    char sfp_vendorDc[E1000_SFF_VENDOR_DC_SIZE + 1];
+	#endif
 };
 
 struct net_device *igb_get_hw_dev(struct e1000_hw *hw);

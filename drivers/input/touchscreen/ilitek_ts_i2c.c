@@ -156,12 +156,28 @@ static int ilitek_process_and_report_v6(struct ilitek_ts_data *ts)
 	struct input_dev *input = ts->input_dev;
 	struct device *dev = &ts->client->dev;
 	unsigned int x, y, status, id;
+    u8 checksum = 0;
 
 	error = ilitek_i2c_write_and_read(ts, NULL, 0, 0, buf, 64);
 	if (error) {
-		dev_err(dev, "get touch info failed, err:%d\n", error);
+		//dev_err(dev, "get touch info failed, err:%d\n", error);
 		goto err_sync_frame;
 	}
+
+    if((buf[0] != 0x48) && (buf[0] != 0x04)) {
+		//dev_warn(dev, "FW msg type error: 0x%02x\n", buf[0]);
+		error = -EINVAL;
+		goto err_sync_frame;
+    }
+
+    for (i=0; i<64; i++) {
+        checksum += buf[i];
+    }
+    if (checksum != 0) {
+		dev_warn(dev, "FW msg checksum error\n");
+		error = -EINVAL;
+		goto err_sync_frame;
+    }
 
 	report_max_point = buf[REPORT_COUNT_ADDRESS];
 	if (report_max_point > ts->max_tp) {
@@ -499,7 +515,7 @@ static irqreturn_t ilitek_i2c_isr(int irq, void *dev_id)
 
 	error = ilitek_process_and_report_v6(ts);
 	if (error < 0) {
-		dev_err(&ts->client->dev, "[%s] err:%d\n", __func__, error);
+		//dev_err(&ts->client->dev, "[%s] err:%d\n", __func__, error);
 		return IRQ_NONE;
 	}
 
@@ -572,8 +588,13 @@ static int ilitek_ts_i2c_probe(struct i2c_client *client,
 
 	error = ilitek_protocol_init(ts);
 	if (error) {
-		dev_err(dev, "protocol init failed: %d", error);
-		return error;
+		if(error == -ENXIO) {
+			dev_err(dev, "protocol init did not find device, retrying : %d", error);
+			return -EPROBE_DEFER;
+		} else {
+			dev_err(dev, "protocol init failed: %d", error);
+			return error;
+		}
 	}
 
 	error = ilitek_read_tp_info(ts, true);

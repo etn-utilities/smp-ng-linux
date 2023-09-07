@@ -106,6 +106,13 @@
 # define FIOQSIZE	0x5460
 #endif
 
+// DA3050 addon
+#define RS232_ENABLE        (1 << 0)
+#define RS485_ENABLE        (1 << 1)
+#define IRIGOUT_ENABLE      (1 << 2)
+#define TIOCSERSETMEDIA     _IOW('T', 0x80, unsigned long)    /* 0x40045480: Set media enable bits: 1=RS232, 2=RS485, 3=IRIGOUT */
+// DA3050
+
 /* Used for packet mode */
 #define TIOCPKT_DATA		 0
 #define TIOCPKT_FLUSHREAD	 1

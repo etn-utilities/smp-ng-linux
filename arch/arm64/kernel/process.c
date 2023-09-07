@@ -125,6 +125,8 @@ void machine_power_off(void)
  */
 void machine_restart(char *cmd)
 {
+	printk("machine_restart\n");
+
 	/* Disable interrupts first */
 	local_irq_disable();
 	smp_send_stop();

@@ -134,8 +134,10 @@ USB_ETHERNET_MODULE_PARAMETERS();
  * used with CDC Ethernet, Linux 2.4 hosts will need updates to choose
  * the non-RNDIS configuration.
  */
-#define RNDIS_VENDOR_NUM	0x0525	/* NetChip */
-#define RNDIS_PRODUCT_NUM	0xa4a2	/* Ethernet/RNDIS Gadget */
+//#define RNDIS_VENDOR_NUM	0x0525	/* NetChip */
+//#define RNDIS_PRODUCT_NUM	0xa4a2	/* Ethernet/RNDIS Gadget */
+#define RNDIS_VENDOR_NUM	0x261F	/* NetChip */
+#define RNDIS_PRODUCT_NUM	0x0301	/* Ethernet/RNDIS Gadget */
 
 /* For EEM gadgets */
 #define EEM_VENDOR_NUM		0x1d6b	/* Linux Foundation */
@@ -172,7 +174,7 @@ static const struct usb_descriptor_header *otg_desc[2];
 static struct usb_string strings_dev[] = {
 	[USB_GADGET_MANUFACTURER_IDX].s = "",
 	[USB_GADGET_PRODUCT_IDX].s = PREFIX DRIVER_DESC,
-	[USB_GADGET_SERIAL_IDX].s = "",
+	[USB_GADGET_SERIAL_IDX].s = "5&a0fcac8&0&4",
 	{  } /* end of list */
 };
 
@@ -398,6 +400,7 @@ static int eth_bind(struct usb_composite_dev *cdev)
 		goto fail1;
 	device_desc.iManufacturer = strings_dev[USB_GADGET_MANUFACTURER_IDX].id;
 	device_desc.iProduct = strings_dev[USB_GADGET_PRODUCT_IDX].id;
+	device_desc.iSerialNumber = strings_dev[USB_GADGET_SERIAL_IDX].id;
 
 	if (gadget_is_otg(gadget) && !otg_desc[0]) {
 		struct usb_descriptor_header *usb_desc;
