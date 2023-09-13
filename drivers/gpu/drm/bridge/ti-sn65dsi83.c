@@ -689,6 +689,19 @@ static int sn65dsi83_probe(struct i2c_client *client,
 	if (ret)
 		return ret;
 
+	{ 
+		// Add optional GPIO to enable the panel power before the lvds module is started.
+		struct gpio_desc		*panel_pwr_gpio;
+
+		panel_pwr_gpio = devm_gpiod_get_optional(ctx->dev, "panel_pwr", GPIOD_OUT_HIGH);
+		if (IS_ERR(panel_pwr_gpio)) {
+			return PTR_ERR(panel_pwr_gpio);
+		}
+		if (panel_pwr_gpio != NULL) {
+			dev_info(ctx->dev, "sn65dsi83_probe: panel_pwr gpio present. Panel power enabled.\n");
+		}
+	}
+
 	ctx->regmap = devm_regmap_init_i2c(client, &sn65dsi83_regmap_config);
 	if (IS_ERR(ctx->regmap)) {
 		ret = PTR_ERR(ctx->regmap);
