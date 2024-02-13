@@ -1450,16 +1450,16 @@ static int imx_uart_startup(struct uart_port *port)
 	/* Can we enable the DMA support? */
 	if (!sport->disable_dma && !uart_console(port) && imx_uart_dma_init(sport) == 0) {
 		dma_is_inited = 1;
-        printk(KERN_INFO "%s  (%d)  %s:  Port:%d DMA enabled.\n"
-            , __FILE__ , __LINE__, __func__
-			, port->line
-        );
+
+		if (!uart_console(port)) {		
+        	printk(KERN_INFO "%s  (%d)  %s:  Port:%d DMA enabled.\n", __FILE__ , __LINE__, __func__, port->line);
+		}
 	}
-	else {
-        printk(KERN_INFO "%s  (%d)  %s:  Port:%d DMA disabled.\n"
-            , __FILE__ , __LINE__, __func__
-			, port->line
-        );
+	else
+	{
+		if (!uart_console(port)) {
+        	printk(KERN_INFO "%s  (%d)  %s:  Port:%d DMA disabled.\n", __FILE__ , __LINE__, __func__, port->line);
+		}
 	}
 
 	spin_lock_irqsave(&sport->port.lock, flags);
@@ -1554,20 +1554,19 @@ static int imx_uart_startup(struct uart_port *port)
     }
 
     if (sport->rs485_enabled_at_boot_time) {
-        printk(KERN_INFO "%s  (%d)  %s:  Port:%d RS485 enabled.\n"
-            , __FILE__ , __LINE__, __func__
-			, port->line
-        );
+		if (!uart_console(port)) {
+        	printk(KERN_INFO "%s  (%d)  %s:  Port:%d RS485 enabled.\n", __FILE__ , __LINE__, __func__, port->line);
+		}
         port->rs485.flags |= SER_RS485_ENABLED;     //reset flag if previoulsy overriden by manual command
         if (sport->rs485_gpio >= 0) {
             gpio_set_value(sport->rs485_gpio, 1);
         }
     }
     else {
-        printk(KERN_INFO "%s  (%d)  %s:  Port:%d RS232 enabled.\n"
-            , __FILE__ , __LINE__, __func__
-			, port->line
-        );
+		if (!uart_console(port)) {
+        	printk(KERN_INFO "%s  (%d)  %s:  Port:%d RS232 enabled.\n", __FILE__ , __LINE__, __func__, port->line);
+		}
+
         port->rs485.flags &= ~SER_RS485_ENABLED;    //reset flag if previoulsy overriden by manual command
                                                     //485 mode must be set manualy in termios parameters
         if (sport->rs232_gpio >= 0) {
@@ -1642,10 +1641,10 @@ static void imx_uart_shutdown(struct uart_port *port)
     #if 1
     if (sport->rs232_gpio >= 0) {
         gpio_set_value(sport->rs232_gpio, 0);
-        printk(KERN_INFO "%s  (%d)  %s:  Port:%d Tristate enabled.\n"
-            , __FILE__ , __LINE__, __func__
-			, port->line
-        );
+
+		if (!uart_console(port)) {
+        	printk(KERN_INFO "%s  (%d)  %s:  Port:%d Tristate enabled.\n" , __FILE__ , __LINE__, __func__, port->line);
+		}
     }
     if (sport->rs485_gpio >= 0) {
         gpio_set_value(sport->rs485_gpio, 0);
@@ -2008,10 +2007,10 @@ static int imx_uart_rs485_config(struct uart_port *port,
 		rs485conf->flags &= ~SER_RS485_ENABLED;
 
 	if (rs485conf->flags & SER_RS485_ENABLED) {
-        printk(KERN_INFO "%s  (%d)  %s:  Port:%d RS485 enabled\n"
-            , __FILE__ , __LINE__, __func__
-			, port->line
-        );
+		if (!uart_console(port)) {
+        	printk(KERN_INFO "%s  (%d)  %s:  Port:%d RS485 enabled\n", __FILE__ , __LINE__, __func__, port->line);
+		}
+
 		/* Enable receiver if low-active RTS signal is requested */
 		if (sport->have_rtscts &&  !sport->have_rtsgpio &&
 		    !(rs485conf->flags & SER_RS485_RTS_ON_SEND))
@@ -2027,11 +2026,8 @@ static int imx_uart_rs485_config(struct uart_port *port,
 
         sport->tx_state = OFF;
 	}
-    else {
-        printk(KERN_INFO "%s  (%d)  %s:  Port:%d RS232 enabled\n"
-            , __FILE__ , __LINE__, __func__
-			, port->line
-        );
+    else if (!uart_console(port)) {
+        printk(KERN_INFO "%s  (%d)  %s:  Port:%d RS232 enabled\n", __FILE__ , __LINE__, __func__, port->line);
     }
 
 	/* Make sure Rx is enabled in case Tx is active with Rx disabled */
@@ -2054,19 +2050,10 @@ static int imx_uart_ioctl(struct uart_port *port, unsigned int cmd, unsigned lon
     {
     case TIOCSERSETMEDIA:
         /* code */
-        #if 0
-        printk(KERN_INFO "%s  (%d)  %s:  cmd:%08x  arg:%08x\n"
-            , __FILE__ , __LINE__, __func__
-            , cmd, arg
-        );
-        #endif
-
         if ((arg & (RS232_ENABLE | RS485_ENABLE)) == (RS232_ENABLE | RS485_ENABLE)) {
-            printk(KERN_INFO "%s  (%d)  %s:  Port:%d Error: RS232 and RS485 buffers cannot be enabled simultaneously.  %08x\n"
-                , __FILE__ , __LINE__, __func__
-                ,  (RS232_ENABLE | RS485_ENABLE)
-				, port->line
-            );
+			if (!uart_console(port)) {
+            	printk(KERN_INFO "%s  (%d)  %s:  Port:%d Error: RS232 and RS485 buffers cannot be enabled simultaneously. (%08x)\n", __FILE__ , __LINE__, __func__, port->line, arg);
+			}
             arg &= ~(RS232_ENABLE | RS485_ENABLE);
         }
 
@@ -2594,11 +2581,9 @@ static int imx_uart_probe(struct platform_device *pdev)
             }
         }
     }
-    printk(KERN_ERR "%s  (%d):  %s:  Port:%d rs232_enable-gpio: %d\n"
-        , __FILE__ , __LINE__, __func__
-		, sport->port.line
-        , sport->rs232_gpio
-    );
+	if (!uart_console(&(sport->port))) {
+    	printk(KERN_INFO "%s  (%d):  %s:  Port:%d rs232_enable-gpio: %d\n", __FILE__ , __LINE__, __func__, sport->port.line, sport->rs232_gpio);
+	}
     if (sport->rs232_gpio == -EPROBE_DEFER) {
         return sport->rs232_gpio;
     }
@@ -2617,11 +2602,9 @@ static int imx_uart_probe(struct platform_device *pdev)
             }
         }
     }
-    printk(KERN_ERR "%s  (%d):  %s:  Port:%d rs485_enable-gpio: %d\n"
-        , __FILE__ , __LINE__, __func__
-		, sport->port.line
-        , sport->rs485_gpio
-    );
+	if (!uart_console(&(sport->port))) {
+		printk(KERN_INFO "%s  (%d):  %s:  Port:%d rs485_enable-gpio: %d\n", __FILE__ , __LINE__, __func__, sport->port.line, sport->rs485_gpio);
+	}
     if (sport->rs485_gpio == -EPROBE_DEFER) {
         return sport->rs485_gpio;
     }
@@ -2640,11 +2623,10 @@ static int imx_uart_probe(struct platform_device *pdev)
             }
         }
     }
-    printk(KERN_ERR "%s  (%d):  %s:  Port:%d irigout_enable-gpio: %d\n"
-        , __FILE__ , __LINE__, __func__
-		, sport->port.line
-        , sport->irigout_gpio
-    );
+	if (!uart_console(&(sport->port))) {
+    	printk(KERN_INFO "%s  (%d):  %s:  Port:%d irigout_enable-gpio: %d\n", __FILE__ , __LINE__, __func__, sport->port.line, sport->irigout_gpio);
+	}
+
     if (sport->irigout_gpio == -EPROBE_DEFER) {
         return sport->irigout_gpio;
     }
