@@ -8,13 +8,13 @@ Here are the branches for each product:
 
 For the SMP-DA3050 product, please use the `eaton/smp/da3050/main` branch. You can access it directly via the following link:
 
-[eaton/smp/da3050/main](https://github.com/etn-utilities/smp-ng-u-boot/tree/eaton/smp/da3050/main)
+[eaton/smp/da3050/main](https://github.com/etn-utilities/smp-ng-linux/tree/eaton/smp/da3050/main)
 
 ## SMP-IO2000
 
 For the SMP-IO2000 product, please use the `eaton/smp/io2000/main` branch. You can access it directly via the following link:
 
-[eaton/smp/io2000/main](https://github.com/etn-utilities/smp-ng-u-boot/tree/eaton/smp/io2000/main)
+[eaton/smp/io2000/main](https://github.com/etn-utilities/smp-ng-linux/tree/eaton/smp/io2000/main)
 
 # Release Branches/Tags
 
