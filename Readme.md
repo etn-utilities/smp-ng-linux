@@ -18,6 +18,6 @@ For the SMP-IO2000 product, please use the `eaton/smp/io2000/main` branch. You c
 
 # Release Branches/Tags
 
-Release branches and tags for each product will be located under `eaton/smp/<product>/releases/`. Please ensure to check this location for the latest stable releases of each product.
+Release branches and tags for each product will be located under `eaton/smp/<product>/release/`. Please ensure to check this location for the latest stable releases of each product.
 
 Please ensure to use the correct branch for your product to avoid any conflicts or issues.
