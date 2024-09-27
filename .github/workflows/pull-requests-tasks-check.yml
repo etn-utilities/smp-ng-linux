@@ -1,0 +1,9 @@
+name: 'Check pull request tasks are completed'
+on:
+  pull_request:
+    types: [edited, opened, reopened, synchronize, ready_for_review]
+
+jobs:
+  checks:
+    uses: etn-utilities/smp-devsecops-workflows/.github/workflows/pull-requests-tasks-check.yml@eaton/smp/main
+    secrets: inherit
