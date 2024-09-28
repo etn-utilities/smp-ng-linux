@@ -1,0 +1,9 @@
+name: Check pull request dependencies
+on:
+  pull_request: 
+    types: [opened, edited, synchronize, closed, reopened, ready_for_review]
+
+jobs:
+  checks:
+    uses: etn-utilities/smp-devsecops-workflows/.github/workflows/pull-requests-dependency-check.yml@eaton/smp/main
+    secrets: inherit

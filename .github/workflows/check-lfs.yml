@@ -1,0 +1,12 @@
+name: Check LFS
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+    branches: [ "eaton/smp/main" ]
+
+  workflow_dispatch:
+  
+jobs:  
+  check-lfs:    
+    uses: etn-utilities/smp-devsecops-workflows/.github/workflows/check-lfs.yml@eaton/smp/main
