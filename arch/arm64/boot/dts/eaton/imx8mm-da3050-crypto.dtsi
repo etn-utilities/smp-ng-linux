@@ -1,0 +1,20 @@
+/ {
+	reserved-memory {
+		#size-cells = <1>;
+		#address-cells = <1>;
+		ranges;
+		crypto_mem: crypto_mem@8fff0000 {
+			reg = <0x8fff0000 0x10000>;
+			label = "eaton-crypto-mem";
+			status = "okay";
+			no-map;
+			compatible = "eaton,crypto";
+		};
+	};
+
+	eaton-crypto {
+		compatible = "eaton,crypto";
+		status = "okay";
+	};
+};
+
